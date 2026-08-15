@@ -125,8 +125,9 @@ final class Preferences {
         set { defaults.set(newValue, forKey: optionTapSpotlightKey) }
     }
 
-    /// Option+Left/Right/Up/Down snap the frontmost window to the left
-    /// half, right half, maximize, or minimize — mirroring Windows'
+    /// Option+Left/Right cycles the frontmost window through the configured
+    /// snap zones (see `SnapZones`/`SnapZonesWindowController`) across every
+    /// monitor; Option+Up/Down maximize/minimize — mirroring Windows'
     /// Win+Arrow shortcuts. Defaults on; independent of the window switcher
     /// (see `HotkeyEventTap.handleSnapKey` for how the two coexist when
     /// Option is also the switcher trigger).

@@ -15,10 +15,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             SpotlightOpener.open()
         }
         HotkeyEventTap.shared.onSnapLeft = {
-            WindowSnapper.snap(to: .left)
+            WindowSnapper.cycleZone(.previous)
         }
         HotkeyEventTap.shared.onSnapRight = {
-            WindowSnapper.snap(to: .right)
+            WindowSnapper.cycleZone(.next)
         }
         HotkeyEventTap.shared.onSnapMaximize = {
             WindowSnapper.maximize()

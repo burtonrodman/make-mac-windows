@@ -5,7 +5,8 @@ import Cocoa
 /// link to `SettingsWindowController` (per-physical-key modifier role
 /// assignment, and the Control+C/V remap's per-app exclusions), the
 /// switcher's trigger, the tap-to-open-Spotlight toggles, the Option+Arrow
-/// window-snapping toggle, the Control+C/V remap toggle, the Home/End
+/// window-snapping toggle, a link to `SnapZonesWindowController` (per-monitor
+/// snap zone count/split), the Control+C/V remap toggle, the Home/End
 /// line/document-navigation remap toggle, the Command+F4 close-window
 /// toggle, and Quit.
 final class StatusItemController {
@@ -79,10 +80,16 @@ final class StatusItemController {
         snapHeader.isEnabled = false
         menu.addItem(snapHeader)
 
-        snapShortcutsToggleItem.title = "Option + Arrow Snaps Windows"
+        snapShortcutsToggleItem.title = "Option + Arrow Snaps/Cycles Windows"
         snapShortcutsToggleItem.action = #selector(toggleSnapShortcuts)
         snapShortcutsToggleItem.target = self
         menu.addItem(snapShortcutsToggleItem)
+
+        let snapZonesItem = NSMenuItem(
+            title: "Snap Zones…", action: #selector(showSnapZones), keyEquivalent: ""
+        )
+        snapZonesItem.target = self
+        menu.addItem(snapZonesItem)
 
         menu.addItem(.separator())
 
@@ -175,6 +182,10 @@ final class StatusItemController {
 
     @objc private func showSettings() {
         SettingsWindowController.shared.show()
+    }
+
+    @objc private func showSnapZones() {
+        SnapZonesWindowController.shared.show()
     }
 
     private func updateCheckmarks() {

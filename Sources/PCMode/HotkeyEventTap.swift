@@ -68,11 +68,12 @@ final class HotkeyEventTap {
     /// arrows cycle the switcher; otherwise they snap the frontmost window
     /// instead. Set by `SwitcherController`.
     var isSwitcherVisible: (() -> Bool)?
-    /// Fired on Start-role-key+Left/Right/Up/Down to snap the frontmost
-    /// window — left half, right half, maximize, minimize, respectively
-    /// (Left Option by default; see `ModifierKeys.swift`). Not fired when
-    /// the Start bucket is also the switcher trigger and its panel is
-    /// currently visible (see `isSwitcherVisible`).
+    /// Fired on Start-role-key+Left/Right/Up/Down to act on the frontmost
+    /// window — cycle to the previous/next configured snap zone (see
+    /// `SnapZones`), maximize, minimize, respectively (Left Option by
+    /// default; see `ModifierKeys.swift`). Not fired when the Start bucket
+    /// is also the switcher trigger and its panel is currently visible (see
+    /// `isSwitcherVisible`).
     var onSnapLeft: (() -> Void)?
     var onSnapRight: (() -> Void)?
     var onSnapMaximize: (() -> Void)?
