@@ -1,0 +1,3 @@
+- left vs right Option??
+- Ctrl+S
+- Alt+F4 - close current window

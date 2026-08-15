@@ -183,6 +183,12 @@ final class HotkeyEventTap {
                 return Unmanaged.passUnretained(event)
             }
 
+            if remapHomeEnd(keyCode: keyCode, flags: flags, event: event) {
+                // Mutated in place to the Cmd+Arrow equivalent above — pass
+                // the same event through rather than swallowing it.
+                return Unmanaged.passUnretained(event)
+            }
+
             if let triggerMask = Preferences.shared.switcherTrigger.mask {
                 if keyCode == kVK_Tab, flags.contains(triggerMask) {
                     onTabDown?(flags.contains(.maskShift))
@@ -260,6 +266,31 @@ final class HotkeyEventTap {
             return false
         }
 
+        event.flags = flags.subtracting(.maskControl).union(.maskCommand)
+        return true
+    }
+
+    /// Home/End remapped to Command+Left/Right (start/end of the current
+    /// line) and Control+Home/Control+End to Command+Up/Down (start/end of
+    /// the whole document) — mirroring Windows, where Home/End are
+    /// line-relative and Control+Home/End are document-relative. macOS has
+    /// no native meaning for the physical Home/End keys in most apps, but
+    /// Command+Left/Right/Up/Down is the standard Mac equivalent everywhere
+    /// text editing works (Cocoa text views, and most apps that follow the
+    /// platform convention). Shift rides along unchanged so Shift+Home/End
+    /// still extends the selection. Returns whether the event was remapped.
+    private func remapHomeEnd(keyCode: Int, flags: CGEventFlags, event: CGEvent) -> Bool {
+        guard Preferences.shared.homeEndRemapEnabled else { return false }
+
+        let isDocument = flags.contains(.maskControl)
+        let newKeyCode: Int
+        switch keyCode {
+        case kVK_Home: newKeyCode = isDocument ? kVK_UpArrow : kVK_LeftArrow
+        case kVK_End: newKeyCode = isDocument ? kVK_DownArrow : kVK_RightArrow
+        default: return false
+        }
+
+        event.setIntegerValueField(.keyboardEventKeycode, value: Int64(newKeyCode))
         event.flags = flags.subtracting(.maskControl).union(.maskCommand)
         return true
     }

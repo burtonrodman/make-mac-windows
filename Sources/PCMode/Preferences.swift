@@ -43,6 +43,7 @@ final class Preferences {
     private let snapShortcutsKey = "snapShortcutsEnabled"
     private let ctrlCVRemapKey = "ctrlCVRemapEnabled"
     private let ctrlCVDenylistKey = "ctrlCVDenylistBundleIDs"
+    private let homeEndRemapKey = "homeEndRemapEnabled"
 
     /// Bundle identifiers exempted from the Control+C/V remap below —
     /// terminal emulators (where Control+C is SIGINT and Control+V can mean
@@ -145,6 +146,15 @@ final class Preferences {
     var ctrlCVDenylistBundleIDs: [String] {
         get { defaults.array(forKey: ctrlCVDenylistKey) as? [String] ?? Self.defaultCtrlCVDenylist }
         set { defaults.set(newValue, forKey: ctrlCVDenylistKey) }
+    }
+
+    /// Home/End remapped to Command+Left/Right (start/end of line) and
+    /// Control+Home/End to Command+Up/Down (start/end of document) —
+    /// mirroring Windows' line/document navigation. Defaults on, like the
+    /// other shortcuts. See `HotkeyEventTap.remapHomeEnd`.
+    var homeEndRemapEnabled: Bool {
+        get { defaults.object(forKey: homeEndRemapKey) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: homeEndRemapKey) }
     }
 }
 

@@ -5,7 +5,8 @@ import Cocoa
 /// the switcher's trigger, the tap-to-open-Spotlight toggles, the
 /// Option+Arrow window-snapping toggle, the Control+C/V remap toggle (plus
 /// a link to `SettingsWindowController` for managing its per-app
-/// exclusions), and Quit.
+/// exclusions), the Home/End line/document-navigation remap toggle, and
+/// Quit.
 final class StatusItemController {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     private let triggerOffItem = NSMenuItem()
@@ -15,6 +16,7 @@ final class StatusItemController {
     private let commandSpotlightToggleItem = NSMenuItem()
     private let snapShortcutsToggleItem = NSMenuItem()
     private let ctrlCVRemapToggleItem = NSMenuItem()
+    private let homeEndRemapToggleItem = NSMenuItem()
 
     func setup() {
         if let button = statusItem.button {
@@ -90,6 +92,17 @@ final class StatusItemController {
         menu.addItem(manageExclusionsItem)
 
         menu.addItem(.separator())
+
+        let navigationHeader = NSMenuItem(title: "Line / Document Navigation", action: nil, keyEquivalent: "")
+        navigationHeader.isEnabled = false
+        menu.addItem(navigationHeader)
+
+        homeEndRemapToggleItem.title = "Home/End → Line, Control+Home/End → Document"
+        homeEndRemapToggleItem.action = #selector(toggleHomeEndRemap)
+        homeEndRemapToggleItem.target = self
+        menu.addItem(homeEndRemapToggleItem)
+
+        menu.addItem(.separator())
         menu.addItem(
             withTitle: "Quit PCMode",
             action: #selector(NSApplication.terminate(_:)),
@@ -135,6 +148,11 @@ final class StatusItemController {
         updateCheckmarks()
     }
 
+    @objc private func toggleHomeEndRemap() {
+        Preferences.shared.homeEndRemapEnabled.toggle()
+        updateCheckmarks()
+    }
+
     @objc private func showSettings() {
         SettingsWindowController.shared.show()
     }
@@ -149,5 +167,6 @@ final class StatusItemController {
         commandSpotlightToggleItem.state = Preferences.shared.commandTapOpensSpotlight ? .on : .off
         snapShortcutsToggleItem.state = Preferences.shared.snapShortcutsEnabled ? .on : .off
         ctrlCVRemapToggleItem.state = Preferences.shared.ctrlCVRemapEnabled ? .on : .off
+        homeEndRemapToggleItem.state = Preferences.shared.homeEndRemapEnabled ? .on : .off
     }
 }
