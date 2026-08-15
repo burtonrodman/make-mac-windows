@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:make-mac-windows}",
+            "name": "Debug PCMode",
+            "target": "PCMode",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug PCMode"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:make-mac-windows}",
+            "name": "Release PCMode",
+            "target": "PCMode",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release PCMode"
+        }
+    ]
+}

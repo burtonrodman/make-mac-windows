@@ -23,6 +23,9 @@ final class SwitcherController {
         HotkeyEventTap.shared.onEscape = { [weak self] in
             self?.cancel()
         }
+        HotkeyEventTap.shared.isSwitcherVisible = { [weak self] in
+            self?.panel.isVisible ?? false
+        }
         HotkeyEventTap.shared.start()
     }
 

@@ -61,6 +61,22 @@ final class HotkeyEventTap {
     /// Fired when Command is tapped alone (see `tapMaxDuration`).
     var onCommandTap: (() -> Void)?
 
+    /// Reports whether the window-switcher panel is currently showing.
+    /// Consulted only when the switcher trigger is Option (see
+    /// `handle(type:event:)`) to resolve the one case where Option+Left/Right
+    /// could mean either thing: mid Option+Tab gesture, the arrows cycle the
+    /// switcher; otherwise they snap the frontmost window instead. Set by
+    /// `SwitcherController`.
+    var isSwitcherVisible: (() -> Bool)?
+    /// Fired on Option+Left/Right/Up/Down to snap the frontmost window —
+    /// left half, right half, maximize, minimize, respectively. Not fired
+    /// when Option is also the switcher trigger and its panel is currently
+    /// visible (see `isSwitcherVisible`).
+    var onSnapLeft: (() -> Void)?
+    var onSnapRight: (() -> Void)?
+    var onSnapMaximize: (() -> Void)?
+    var onSnapMinimize: (() -> Void)?
+
     private init() {}
 
     /// (Re)installs the event tap. Safe to call repeatedly — tears down any
@@ -153,23 +169,29 @@ final class HotkeyEventTap {
             return Unmanaged.passUnretained(event)
         }
 
-        if type == .keyDown, let triggerMask = Preferences.shared.switcherTrigger.mask {
+        if type == .keyDown {
             let keyCode = Int(event.getIntegerValueField(.keyboardEventKeycode))
             let flags = event.flags
 
-            if keyCode == kVK_Tab, flags.contains(triggerMask) {
-                onTabDown?(flags.contains(.maskShift))
-                return nil // swallow so the frontmost app never sees it
-            }
-            // Left/Right arrows cycle the switcher too, mirroring Tab/Shift+Tab,
-            // while the trigger modifier is held.
-            if keyCode == kVK_LeftArrow, flags.contains(triggerMask) {
-                onTabDown?(true)
+            if handleSnapKey(keyCode: keyCode, flags: flags) {
                 return nil
             }
-            if keyCode == kVK_RightArrow, flags.contains(triggerMask) {
-                onTabDown?(false)
-                return nil
+
+            if let triggerMask = Preferences.shared.switcherTrigger.mask {
+                if keyCode == kVK_Tab, flags.contains(triggerMask) {
+                    onTabDown?(flags.contains(.maskShift))
+                    return nil // swallow so the frontmost app never sees it
+                }
+                // Left/Right arrows cycle the switcher too, mirroring
+                // Tab/Shift+Tab, while the trigger modifier is held.
+                if keyCode == kVK_LeftArrow, flags.contains(triggerMask) {
+                    onTabDown?(true)
+                    return nil
+                }
+                if keyCode == kVK_RightArrow, flags.contains(triggerMask) {
+                    onTabDown?(false)
+                    return nil
+                }
             }
             if keyCode == kVK_Escape, triggerIsDown {
                 onEscape?()
@@ -178,6 +200,31 @@ final class HotkeyEventTap {
         }
 
         return Unmanaged.passUnretained(event)
+    }
+
+    /// Option+Left/Right/Up/Down snap the frontmost window (left half, right
+    /// half, maximize, minimize). Returns whether the event was consumed.
+    ///
+    /// This only ever collides with the switcher's own arrow-cycling (see
+    /// `handle(type:event:)`) when Option is *also* the switcher trigger —
+    /// in that case, whichever behavior applies depends on whether the
+    /// switcher panel is already up: mid Option+Tab gesture, Left/Right keep
+    /// cycling it (returns false here, so the trigger-mask branch below
+    /// handles it instead); otherwise they snap.
+    private func handleSnapKey(keyCode: Int, flags: CGEventFlags) -> Bool {
+        guard Preferences.shared.snapShortcutsEnabled, flags.contains(.maskAlternate) else { return false }
+
+        let switcherOwnsArrows = Preferences.shared.switcherTrigger == .option && (isSwitcherVisible?() ?? false)
+        guard !switcherOwnsArrows else { return false }
+
+        switch keyCode {
+        case kVK_LeftArrow: onSnapLeft?()
+        case kVK_RightArrow: onSnapRight?()
+        case kVK_UpArrow: onSnapMaximize?()
+        case kVK_DownArrow: onSnapMinimize?()
+        default: return false
+        }
+        return true
     }
 
     private func trackModifierTap(

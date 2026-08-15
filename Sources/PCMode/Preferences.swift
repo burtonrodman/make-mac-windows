@@ -40,6 +40,7 @@ final class Preferences {
     private let triggerKey = "switcherTrigger"
     private let commandTapSpotlightKey = "commandTapOpensSpotlight"
     private let optionTapSpotlightKey = "optionTapOpensSpotlight"
+    private let snapShortcutsKey = "snapShortcutsEnabled"
 
     private init() {
         migrateLegacyTriggerPreferenceIfNeeded()
@@ -96,6 +97,16 @@ final class Preferences {
     var optionTapOpensSpotlight: Bool {
         get { defaults.object(forKey: optionTapSpotlightKey) as? Bool ?? true }
         set { defaults.set(newValue, forKey: optionTapSpotlightKey) }
+    }
+
+    /// Option+Left/Right/Up/Down snap the frontmost window to the left
+    /// half, right half, maximize, or minimize — mirroring Windows'
+    /// Win+Arrow shortcuts. Defaults on; independent of the window switcher
+    /// (see `HotkeyEventTap.handleSnapKey` for how the two coexist when
+    /// Option is also the switcher trigger).
+    var snapShortcutsEnabled: Bool {
+        get { defaults.object(forKey: snapShortcutsKey) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: snapShortcutsKey) }
     }
 }
 

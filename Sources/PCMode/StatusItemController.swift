@@ -2,7 +2,8 @@ import Cocoa
 
 /// The menu-bar icon that will grow into the control center for every
 /// PCMode module (keyboard, mouse, window management). For now it offers
-/// the switcher's trigger, the Command-tap-opens-Spotlight toggle, and Quit.
+/// the switcher's trigger, the tap-to-open-Spotlight toggles, the
+/// Option+Arrow window-snapping toggle, and Quit.
 final class StatusItemController {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     private let triggerOffItem = NSMenuItem()
@@ -10,6 +11,7 @@ final class StatusItemController {
     private let triggerCommandItem = NSMenuItem()
     private let optionSpotlightToggleItem = NSMenuItem()
     private let commandSpotlightToggleItem = NSMenuItem()
+    private let snapShortcutsToggleItem = NSMenuItem()
 
     func setup() {
         if let button = statusItem.button {
@@ -57,6 +59,17 @@ final class StatusItemController {
         menu.addItem(commandSpotlightToggleItem)
 
         menu.addItem(.separator())
+
+        let snapHeader = NSMenuItem(title: "Snap Windows", action: nil, keyEquivalent: "")
+        snapHeader.isEnabled = false
+        menu.addItem(snapHeader)
+
+        snapShortcutsToggleItem.title = "Option + Arrow Snaps Windows"
+        snapShortcutsToggleItem.action = #selector(toggleSnapShortcuts)
+        snapShortcutsToggleItem.target = self
+        menu.addItem(snapShortcutsToggleItem)
+
+        menu.addItem(.separator())
         menu.addItem(
             withTitle: "Quit PCMode",
             action: #selector(NSApplication.terminate(_:)),
@@ -92,6 +105,11 @@ final class StatusItemController {
         updateCheckmarks()
     }
 
+    @objc private func toggleSnapShortcuts() {
+        Preferences.shared.snapShortcutsEnabled.toggle()
+        updateCheckmarks()
+    }
+
     private func updateCheckmarks() {
         let current = Preferences.shared.switcherTrigger
         triggerOffItem.state = current == .off ? .on : .off
@@ -100,5 +118,6 @@ final class StatusItemController {
 
         optionSpotlightToggleItem.state = Preferences.shared.optionTapOpensSpotlight ? .on : .off
         commandSpotlightToggleItem.state = Preferences.shared.commandTapOpensSpotlight ? .on : .off
+        snapShortcutsToggleItem.state = Preferences.shared.snapShortcutsEnabled ? .on : .off
     }
 }

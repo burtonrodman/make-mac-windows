@@ -14,6 +14,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         HotkeyEventTap.shared.onCommandTap = {
             SpotlightOpener.open()
         }
+        HotkeyEventTap.shared.onSnapLeft = {
+            WindowSnapper.snap(to: .left)
+        }
+        HotkeyEventTap.shared.onSnapRight = {
+            WindowSnapper.snap(to: .right)
+        }
+        HotkeyEventTap.shared.onSnapMaximize = {
+            WindowSnapper.maximize()
+        }
+        HotkeyEventTap.shared.onSnapMinimize = {
+            WindowSnapper.minimize()
+        }
         SwitcherController.shared.start()
         startPermissionPollingIfNeeded()
     }
