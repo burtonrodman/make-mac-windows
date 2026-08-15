@@ -48,8 +48,9 @@ final class HotkeyEventTap {
 
     private(set) var isInstalled = false
 
-    /// Fired on trigger+Tab (and repeats, from OS key-repeat, while held).
-    /// `reverse` is true when Shift is also held.
+    /// Fired on trigger+Tab or trigger+Left/Right arrow (and repeats, from OS
+    /// key-repeat, while held). `reverse` is true when Shift is also held,
+    /// or the key is the Left arrow.
     var onTabDown: ((_ reverse: Bool) -> Void)?
     /// Fired when the trigger modifier is released — commits the selection.
     var onTriggerReleased: (() -> Void)?
@@ -159,6 +160,16 @@ final class HotkeyEventTap {
             if keyCode == kVK_Tab, flags.contains(triggerMask) {
                 onTabDown?(flags.contains(.maskShift))
                 return nil // swallow so the frontmost app never sees it
+            }
+            // Left/Right arrows cycle the switcher too, mirroring Tab/Shift+Tab,
+            // while the trigger modifier is held.
+            if keyCode == kVK_LeftArrow, flags.contains(triggerMask) {
+                onTabDown?(true)
+                return nil
+            }
+            if keyCode == kVK_RightArrow, flags.contains(triggerMask) {
+                onTabDown?(false)
+                return nil
             }
             if keyCode == kVK_Escape, triggerIsDown {
                 onEscape?()
