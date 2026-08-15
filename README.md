@@ -74,6 +74,41 @@ won't do anything if you've changed Spotlight's shortcut in System Settings
   activation history.
 - Single-monitor-aware centering (HUD centers on `NSScreen.main`).
 
+## Feature 4: Control+C / Control+V copy and paste
+
+Windows copies and pastes with Ctrl+C / Ctrl+V; the Mac equivalents are
+Cmd+C / Cmd+V. PCMode remaps the former to the latter almost everywhere —
+but "almost" is load-bearing here, since Control isn't an unclaimed modifier
+the way Option was for the window switcher:
+
+- **Terminals** (Terminal.app, iTerm2, etc.) rely on the literal Ctrl+C as
+  the interrupt signal (SIGINT) and sometimes Ctrl+V for a raw/literal paste
+  — remapping those would break running processes, not just muscle memory.
+- **Remote-desktop and VM consoles** (Microsoft Remote Desktop, Screen
+  Sharing, Parallels, VMware Fusion) need the literal keystroke to reach the
+  guest OS/remote session, which may have its own idea of what Ctrl+C means.
+
+So the remap is skipped for any app on an exclusion list (seeded with the
+apps above, plus a few more terminal emulators), editable from the menu-bar
+icon's **Manage Excluded Apps…** window (`SettingsWindowController.swift`)
+— add or remove apps there, or reset to the built-in defaults.
+
+The remap only fires for *bare* Control+C/V (no Shift/Option/Command riding
+along), so it never touches Ctrl+Shift+C — Inspect Element in every major
+browser — or any other Ctrl-based shortcut. Toggle the whole feature on/off
+from the menu-bar icon, independent of the exclusion list.
+
+### Known limitation
+
+Apps that host more than one kind of view under one bundle ID — most
+notably VS Code, whose editor and integrated terminal are the same process
+— can't be split by this exclusion list, since the event tap only knows
+which *app* is frontmost, not which view inside it has focus. Excluding VS
+Code protects its terminal's Ctrl+C but also means its editor pane won't
+get the remap; leaving it off the list gets editor remapping but risks the
+terminal's Ctrl+C. VS Code ships on the exclusion list by default (terminal
+safety wins), but either way is a one-line edit in the Settings window.
+
 ## Required permissions
 
 PCMode needs two permissions, both requested automatically on first launch:

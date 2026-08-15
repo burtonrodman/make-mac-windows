@@ -177,6 +177,12 @@ final class HotkeyEventTap {
                 return nil
             }
 
+            if remapControlCopyPaste(keyCode: keyCode, flags: flags, event: event) {
+                // Mutated in place to Cmd+C/V above — pass the same event
+                // through rather than swallowing it.
+                return Unmanaged.passUnretained(event)
+            }
+
             if let triggerMask = Preferences.shared.switcherTrigger.mask {
                 if keyCode == kVK_Tab, flags.contains(triggerMask) {
                     onTabDown?(flags.contains(.maskShift))
@@ -224,6 +230,37 @@ final class HotkeyEventTap {
         case kVK_DownArrow: onSnapMinimize?()
         default: return false
         }
+        return true
+    }
+
+    /// Control+C / Control+V, remapped to Command+C / Command+V in place —
+    /// mirroring Windows' copy/paste shortcuts. Requires *bare* Control (no
+    /// Shift/Option/Command riding along), so it never touches Ctrl+Shift+C
+    /// (Inspect Element in every major browser) or any other Ctrl-based
+    /// combo. Skipped entirely when the frontmost app is on
+    /// `Preferences.ctrlCVDenylistBundleIDs` — terminals need the literal
+    /// Control+C (SIGINT) and Control+V (raw paste), and remote-desktop/VM
+    /// consoles need the literal keystroke to reach the far end. Returns
+    /// whether the event was remapped.
+    private func remapControlCopyPaste(keyCode: Int, flags: CGEventFlags, event: CGEvent) -> Bool {
+        guard Preferences.shared.ctrlCVRemapEnabled else { return false }
+        guard keyCode == kVK_ANSI_C || keyCode == kVK_ANSI_V else { return false }
+        guard
+            flags.contains(.maskControl),
+            !flags.contains(.maskCommand),
+            !flags.contains(.maskShift),
+            !flags.contains(.maskAlternate)
+        else {
+            return false
+        }
+
+        if let bundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
+            Preferences.shared.ctrlCVDenylistBundleIDs.contains(bundleID)
+        {
+            return false
+        }
+
+        event.flags = flags.subtracting(.maskControl).union(.maskCommand)
         return true
     }
 

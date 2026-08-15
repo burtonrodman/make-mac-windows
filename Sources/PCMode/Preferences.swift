@@ -41,6 +41,26 @@ final class Preferences {
     private let commandTapSpotlightKey = "commandTapOpensSpotlight"
     private let optionTapSpotlightKey = "optionTapOpensSpotlight"
     private let snapShortcutsKey = "snapShortcutsEnabled"
+    private let ctrlCVRemapKey = "ctrlCVRemapEnabled"
+    private let ctrlCVDenylistKey = "ctrlCVDenylistBundleIDs"
+
+    /// Bundle identifiers exempted from the Control+C/V remap below —
+    /// terminal emulators (where Control+C is SIGINT and Control+V can mean
+    /// "paste literally") and remote-desktop/VM consoles (where the literal
+    /// keystroke needs to reach the far end), seeded in on first launch.
+    /// User-editable in the Settings window (`SettingsWindowController`).
+    static let defaultCtrlCVDenylist = [
+        "com.apple.Terminal",
+        "com.googlecode.iterm2",
+        "com.github.wez.wezterm",
+        "net.kovidgoyal.kitty",
+        "co.zeit.hyper",
+        "com.microsoft.VSCode",
+        "com.microsoft.rdc.macos",
+        "com.apple.ScreenSharing",
+        "com.parallels.desktop.console",
+        "com.vmware.fusion",
+    ]
 
     private init() {
         migrateLegacyTriggerPreferenceIfNeeded()
@@ -107,6 +127,24 @@ final class Preferences {
     var snapShortcutsEnabled: Bool {
         get { defaults.object(forKey: snapShortcutsKey) as? Bool ?? true }
         set { defaults.set(newValue, forKey: snapShortcutsKey) }
+    }
+
+    /// Control+C / Control+V remapped to Command+C / Command+V, mirroring
+    /// Windows' copy/paste shortcuts. Defaults on, like the other shortcuts;
+    /// gated per-app by `ctrlCVDenylistBundleIDs` so it doesn't clobber
+    /// Control+C-as-SIGINT in terminals etc. See `HotkeyEventTap`.
+    var ctrlCVRemapEnabled: Bool {
+        get { defaults.object(forKey: ctrlCVRemapKey) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: ctrlCVRemapKey) }
+    }
+
+    /// Apps where Control+C/V passes through unmodified rather than being
+    /// remapped — see `defaultCtrlCVDenylist` for why these specific apps
+    /// need the literal keystroke. Falls back to that seed list until the
+    /// user (or `SettingsWindowController`) explicitly saves an edited one.
+    var ctrlCVDenylistBundleIDs: [String] {
+        get { defaults.array(forKey: ctrlCVDenylistKey) as? [String] ?? Self.defaultCtrlCVDenylist }
+        set { defaults.set(newValue, forKey: ctrlCVDenylistKey) }
     }
 }
 
