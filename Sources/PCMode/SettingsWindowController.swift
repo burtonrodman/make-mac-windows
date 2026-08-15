@@ -15,6 +15,8 @@ import UniformTypeIdentifiers
 final class SettingsWindowController: NSWindowController {
     static let shared = SettingsWindowController()
 
+    private static let padding: CGFloat = 20
+
     private let tableView = NSTableView()
     private var bundleIDs: [String] = []
 
@@ -92,15 +94,20 @@ final class SettingsWindowController: NSWindowController {
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 12
-        stack.edgeInsets = NSEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
         stack.translatesAutoresizingMaskIntoConstraints = false
 
         contentView.addSubview(stack)
+        // The padding lives on these outer constraints, pinning the stack
+        // itself inset from contentView's edges, rather than on
+        // `stack.edgeInsets` — edgeInsets only pads arranged subviews away
+        // from the stack's own frame, and the width==stack.widthAnchor
+        // constraints below would cancel that padding right back out by
+        // forcing every child to span the stack's full (uninset) width.
         NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: contentView.topAnchor),
-            stack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
-            stack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            stack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: Self.padding),
+            stack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -Self.padding),
+            stack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: Self.padding),
+            stack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -Self.padding),
             heading.widthAnchor.constraint(equalTo: stack.widthAnchor),
             explanation.widthAnchor.constraint(equalTo: stack.widthAnchor),
             scrollView.widthAnchor.constraint(equalTo: stack.widthAnchor),
