@@ -1,0 +1,5 @@
+# Force LF line endings for shell scripts regardless of a contributor's
+# local core.autocrlf setting. Windows-style CRLF endings break the
+# shebang/`set` line in bash (e.g. "set -euo pipefail\r" is parsed as an
+# invalid option name).
+*.sh text eol=lf
