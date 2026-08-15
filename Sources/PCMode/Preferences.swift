@@ -41,7 +41,28 @@ final class Preferences {
     private let commandTapSpotlightKey = "commandTapOpensSpotlight"
     private let optionTapSpotlightKey = "optionTapOpensSpotlight"
 
-    private init() {}
+    private init() {
+        migrateLegacyTriggerPreferenceIfNeeded()
+    }
+
+    /// An earlier build stored this under the key "triggerModifier" before
+    /// the Off/Option/Command three-way trigger existed. Renaming the key
+    /// without this migration meant anyone who'd chosen Command+Tab got
+    /// silently reset to the default (Option+Tab) on the next launch, with
+    /// no error — exactly the kind of thing that looks like "it just
+    /// stopped working." If the old key still has a value and the new one
+    /// was never explicitly set, carry the old choice forward instead.
+    private func migrateLegacyTriggerPreferenceIfNeeded() {
+        let legacyKey = "triggerModifier"
+        guard
+            defaults.object(forKey: triggerKey) == nil,
+            let legacyRaw = defaults.string(forKey: legacyKey)
+        else {
+            return
+        }
+        defaults.set(legacyRaw, forKey: triggerKey)
+        defaults.removeObject(forKey: legacyKey)
+    }
 
     var switcherTrigger: SwitcherTrigger {
         get {
