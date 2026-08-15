@@ -6,7 +6,8 @@ import Cocoa
 /// assignment, and the Control+C/V remap's per-app exclusions), the
 /// switcher's trigger, the tap-to-open-Spotlight toggles, the Option+Arrow
 /// window-snapping toggle, the Control+C/V remap toggle, the Home/End
-/// line/document-navigation remap toggle, and Quit.
+/// line/document-navigation remap toggle, the Command+F4 close-window
+/// toggle, and Quit.
 final class StatusItemController {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     private let triggerOffItem = NSMenuItem()
@@ -17,6 +18,7 @@ final class StatusItemController {
     private let snapShortcutsToggleItem = NSMenuItem()
     private let ctrlCVRemapToggleItem = NSMenuItem()
     private let homeEndRemapToggleItem = NSMenuItem()
+    private let closeWindowToggleItem = NSMenuItem()
 
     func setup() {
         if let button = statusItem.button {
@@ -105,6 +107,17 @@ final class StatusItemController {
         menu.addItem(homeEndRemapToggleItem)
 
         menu.addItem(.separator())
+
+        let closeWindowHeader = NSMenuItem(title: "Close Window", action: nil, keyEquivalent: "")
+        closeWindowHeader.isEnabled = false
+        menu.addItem(closeWindowHeader)
+
+        closeWindowToggleItem.title = "Command + F4 Closes Focused Window"
+        closeWindowToggleItem.action = #selector(toggleCloseWindowShortcut)
+        closeWindowToggleItem.target = self
+        menu.addItem(closeWindowToggleItem)
+
+        menu.addItem(.separator())
         menu.addItem(
             withTitle: "Quit PCMode",
             action: #selector(NSApplication.terminate(_:)),
@@ -155,6 +168,11 @@ final class StatusItemController {
         updateCheckmarks()
     }
 
+    @objc private func toggleCloseWindowShortcut() {
+        Preferences.shared.closeWindowShortcutEnabled.toggle()
+        updateCheckmarks()
+    }
+
     @objc private func showSettings() {
         SettingsWindowController.shared.show()
     }
@@ -170,5 +188,6 @@ final class StatusItemController {
         snapShortcutsToggleItem.state = Preferences.shared.snapShortcutsEnabled ? .on : .off
         ctrlCVRemapToggleItem.state = Preferences.shared.ctrlCVRemapEnabled ? .on : .off
         homeEndRemapToggleItem.state = Preferences.shared.homeEndRemapEnabled ? .on : .off
+        closeWindowToggleItem.state = Preferences.shared.closeWindowShortcutEnabled ? .on : .off
     }
 }

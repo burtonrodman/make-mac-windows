@@ -1,2 +1,2 @@
 - Ctrl+S
-- Alt+F4 - close current window
+- ~~Alt+F4 - close current window~~ (shipped as Command+F4 — see `WindowCloser.swift`)

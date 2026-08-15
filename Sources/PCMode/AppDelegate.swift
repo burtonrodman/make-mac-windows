@@ -26,6 +26,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         HotkeyEventTap.shared.onSnapMinimize = {
             WindowSnapper.minimize()
         }
+        HotkeyEventTap.shared.onCloseWindow = {
+            WindowCloser.closeFocusedWindow()
+        }
         SwitcherController.shared.start()
         startPermissionPollingIfNeeded()
     }

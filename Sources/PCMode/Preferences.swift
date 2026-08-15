@@ -48,6 +48,7 @@ final class Preferences {
     private let ctrlCVRemapKey = "ctrlCVRemapEnabled"
     private let ctrlCVDenylistKey = "ctrlCVDenylistBundleIDs"
     private let homeEndRemapKey = "homeEndRemapEnabled"
+    private let closeWindowShortcutKey = "closeWindowShortcutEnabled"
 
     /// Bundle identifiers exempted from the Control+C/V remap below —
     /// terminal emulators (where Control+C is SIGINT and Control+V can mean
@@ -159,6 +160,15 @@ final class Preferences {
     var homeEndRemapEnabled: Bool {
         get { defaults.object(forKey: homeEndRemapKey) as? Bool ?? true }
         set { defaults.set(newValue, forKey: homeEndRemapKey) }
+    }
+
+    /// Command+F4 closes the focused window, mirroring Windows' Alt+F4 (bound
+    /// to Command rather than Option/Start so it doesn't collide with the
+    /// switcher/snap/tap-for-Spotlight shortcuts). Defaults on, like the
+    /// other shortcuts. See `HotkeyEventTap` / `WindowCloser`.
+    var closeWindowShortcutEnabled: Bool {
+        get { defaults.object(forKey: closeWindowShortcutKey) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: closeWindowShortcutKey) }
     }
 }
 

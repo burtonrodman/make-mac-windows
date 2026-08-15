@@ -77,6 +77,12 @@ final class HotkeyEventTap {
     var onSnapRight: (() -> Void)?
     var onSnapMaximize: (() -> Void)?
     var onSnapMinimize: (() -> Void)?
+    /// Fired on Command-role-key+F4 — closes the focused window, mirroring
+    /// Windows' Alt+F4 (Left/Right Command by default; see
+    /// `ModifierKeys.swift`). Bound to Command rather than the Start bucket
+    /// so it doesn't collide with Option's tap-for-Spotlight/switcher/snap
+    /// duties.
+    var onCloseWindow: (() -> Void)?
 
     private init() {}
 
@@ -188,6 +194,10 @@ final class HotkeyEventTap {
                 return nil
             }
 
+            if handleCloseWindowKey(keyCode: keyCode, flags: flags) {
+                return nil
+            }
+
             if remapControlCopyPaste(keyCode: keyCode, flags: flags, event: event) {
                 // Mutated in place to Cmd+C/V above — pass the same event
                 // through rather than swallowing it.
@@ -254,6 +264,22 @@ final class HotkeyEventTap {
         case kVK_DownArrow: onSnapMinimize?()
         default: return false
         }
+        return true
+    }
+
+    /// Command-role-key+F4 closes the focused window — mirroring Windows'
+    /// Alt+F4, but bound to Command (Left/Right Command by default; see
+    /// `ModifierKeys.swift`) rather than the Start bucket, so it doesn't
+    /// collide with Option's tap-for-Spotlight/switcher/snap duties.
+    /// Returns whether the event was consumed.
+    private func handleCloseWindowKey(keyCode: Int, flags: CGEventFlags) -> Bool {
+        guard
+            Preferences.shared.closeWindowShortcutEnabled,
+            keyCode == kVK_F4,
+            Preferences.shared.isBucketHeld(.command, in: flags)
+        else { return false }
+
+        onCloseWindow?()
         return true
     }
 
