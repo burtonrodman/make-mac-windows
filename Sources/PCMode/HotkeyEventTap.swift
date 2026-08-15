@@ -62,16 +62,17 @@ final class HotkeyEventTap {
     var onCommandTap: (() -> Void)?
 
     /// Reports whether the window-switcher panel is currently showing.
-    /// Consulted only when the switcher trigger is Option (see
-    /// `handle(type:event:)`) to resolve the one case where Option+Left/Right
-    /// could mean either thing: mid Option+Tab gesture, the arrows cycle the
-    /// switcher; otherwise they snap the frontmost window instead. Set by
-    /// `SwitcherController`.
+    /// Consulted only when the switcher trigger is the Start bucket (see
+    /// `handle(type:event:)`) to resolve the one case where a Start-role-key
+    /// +Left/Right could mean either thing: mid trigger+Tab gesture, the
+    /// arrows cycle the switcher; otherwise they snap the frontmost window
+    /// instead. Set by `SwitcherController`.
     var isSwitcherVisible: (() -> Bool)?
-    /// Fired on Option+Left/Right/Up/Down to snap the frontmost window —
-    /// left half, right half, maximize, minimize, respectively. Not fired
-    /// when Option is also the switcher trigger and its panel is currently
-    /// visible (see `isSwitcherVisible`).
+    /// Fired on Start-role-key+Left/Right/Up/Down to snap the frontmost
+    /// window — left half, right half, maximize, minimize, respectively
+    /// (Left Option by default; see `ModifierKeys.swift`). Not fired when
+    /// the Start bucket is also the switcher trigger and its panel is
+    /// currently visible (see `isSwitcherVisible`).
     var onSnapLeft: (() -> Void)?
     var onSnapRight: (() -> Void)?
     var onSnapMaximize: (() -> Void)?
@@ -143,22 +144,32 @@ final class HotkeyEventTap {
         // switcher's own trigger) from also opening Spotlight when the
         // modifier comes back up.
         if type == .keyDown {
-            if event.flags.contains(.maskAlternate) { optionTapState.otherKeyPressedDuringHold = true }
-            if event.flags.contains(.maskCommand) { commandTapState.otherKeyPressedDuringHold = true }
+            if Preferences.shared.isBucketHeld(.start, in: event.flags) {
+                optionTapState.otherKeyPressedDuringHold = true
+            }
+            if Preferences.shared.isBucketHeld(.command, in: event.flags) {
+                commandTapState.otherKeyPressedDuringHold = true
+            }
         }
 
         if type == .flagsChanged {
+            NSLog(
+                "[PCMode][debug] flags=0x%llX keyCode=%d slotsDown=%@",
+                event.flags.rawValue,
+                event.getIntegerValueField(.keyboardEventKeycode),
+                ModifierSlot.allCases.filter { $0.isDown(event.flags) }.map(\.rawValue).description
+            )
             trackModifierTap(
-                event: event, mask: .maskAlternate, state: &optionTapState,
+                event: event, bucket: .start, state: &optionTapState,
                 enabled: Preferences.shared.optionTapOpensSpotlight, onTap: onOptionTap
             )
             trackModifierTap(
-                event: event, mask: .maskCommand, state: &commandTapState,
+                event: event, bucket: .command, state: &commandTapState,
                 enabled: Preferences.shared.commandTapOpensSpotlight, onTap: onCommandTap
             )
 
-            if let triggerMask = Preferences.shared.switcherTrigger.mask {
-                let triggerNowDown = event.flags.contains(triggerMask)
+            if let triggerBucket = Preferences.shared.switcherTrigger.bucket {
+                let triggerNowDown = Preferences.shared.isBucketHeld(triggerBucket, in: event.flags)
                 if triggerIsDown && !triggerNowDown {
                     triggerIsDown = false
                     onTriggerReleased?()
@@ -189,18 +200,19 @@ final class HotkeyEventTap {
                 return Unmanaged.passUnretained(event)
             }
 
-            if let triggerMask = Preferences.shared.switcherTrigger.mask {
-                if keyCode == kVK_Tab, flags.contains(triggerMask) {
+            if let triggerBucket = Preferences.shared.switcherTrigger.bucket {
+                let triggerHeld = Preferences.shared.isBucketHeld(triggerBucket, in: flags)
+                if keyCode == kVK_Tab, triggerHeld {
                     onTabDown?(flags.contains(.maskShift))
                     return nil // swallow so the frontmost app never sees it
                 }
                 // Left/Right arrows cycle the switcher too, mirroring
                 // Tab/Shift+Tab, while the trigger modifier is held.
-                if keyCode == kVK_LeftArrow, flags.contains(triggerMask) {
+                if keyCode == kVK_LeftArrow, triggerHeld {
                     onTabDown?(true)
                     return nil
                 }
-                if keyCode == kVK_RightArrow, flags.contains(triggerMask) {
+                if keyCode == kVK_RightArrow, triggerHeld {
                     onTabDown?(false)
                     return nil
                 }
@@ -214,17 +226,23 @@ final class HotkeyEventTap {
         return Unmanaged.passUnretained(event)
     }
 
-    /// Option+Left/Right/Up/Down snap the frontmost window (left half, right
-    /// half, maximize, minimize). Returns whether the event was consumed.
+    /// Start-role-key+Left/Right/Up/Down snap the frontmost window (left
+    /// half, right half, maximize, minimize) — by default that's Left
+    /// Option only (see `ModifierKeys.swift`), so Right Option is free for
+    /// whatever it's assigned instead. Returns whether the event was
+    /// consumed.
     ///
     /// This only ever collides with the switcher's own arrow-cycling (see
-    /// `handle(type:event:)`) when Option is *also* the switcher trigger —
-    /// in that case, whichever behavior applies depends on whether the
-    /// switcher panel is already up: mid Option+Tab gesture, Left/Right keep
-    /// cycling it (returns false here, so the trigger-mask branch below
-    /// handles it instead); otherwise they snap.
+    /// `handle(type:event:)`) when the switcher trigger is *also* the Start
+    /// bucket — in that case, whichever behavior applies depends on whether
+    /// the switcher panel is already up: mid trigger+Tab gesture, Left/Right
+    /// keep cycling it (returns false here, so the trigger-bucket branch
+    /// below handles it instead); otherwise they snap.
     private func handleSnapKey(keyCode: Int, flags: CGEventFlags) -> Bool {
-        guard Preferences.shared.snapShortcutsEnabled, flags.contains(.maskAlternate) else { return false }
+        guard
+            Preferences.shared.snapShortcutsEnabled,
+            Preferences.shared.isBucketHeld(.start, in: flags)
+        else { return false }
 
         let switcherOwnsArrows = Preferences.shared.switcherTrigger == .option && (isSwitcherVisible?() ?? false)
         guard !switcherOwnsArrows else { return false }
@@ -243,7 +261,10 @@ final class HotkeyEventTap {
     /// mirroring Windows' copy/paste shortcuts. Requires *bare* Control (no
     /// Shift/Option/Command riding along), so it never touches Ctrl+Shift+C
     /// (Inspect Element in every major browser) or any other Ctrl-based
-    /// combo. Skipped entirely when the frontmost app is on
+    /// combo. "Control" here means whichever physical key(s) are currently
+    /// assigned the `.control` role (see `ModifierKeys.swift`) — by default
+    /// Left Control plus Right Option, not necessarily literal Control.
+    /// Skipped entirely when the frontmost app is on
     /// `Preferences.ctrlCVDenylistBundleIDs` — terminals need the literal
     /// Control+C (SIGINT) and Control+V (raw paste), and remote-desktop/VM
     /// consoles need the literal keystroke to reach the far end. Returns
@@ -251,11 +272,20 @@ final class HotkeyEventTap {
     private func remapControlCopyPaste(keyCode: Int, flags: CGEventFlags, event: CGEvent) -> Bool {
         guard Preferences.shared.ctrlCVRemapEnabled else { return false }
         guard keyCode == kVK_ANSI_C || keyCode == kVK_ANSI_V else { return false }
+
+        let controlSlots = Preferences.shared.slotsHeld(inBucket: .control, flags: flags)
+        guard !controlSlots.isEmpty else { return false }
+
+        // "Bare" means nothing is left once the contributing key(s)' own
+        // bits are stripped away — so Ctrl+Shift+C, Ctrl+Option+C (from some
+        // other key riding along), etc. are still left alone.
+        var remaining = flags
+        for slot in controlSlots { remaining.subtract(slot.flagBits) }
         guard
-            flags.contains(.maskControl),
-            !flags.contains(.maskCommand),
-            !flags.contains(.maskShift),
-            !flags.contains(.maskAlternate)
+            !remaining.contains(.maskControl),
+            !remaining.contains(.maskCommand),
+            !remaining.contains(.maskShift),
+            !remaining.contains(.maskAlternate)
         else {
             return false
         }
@@ -266,7 +296,7 @@ final class HotkeyEventTap {
             return false
         }
 
-        event.flags = flags.subtracting(.maskControl).union(.maskCommand)
+        event.flags = remaining.union(.maskCommand)
         return true
     }
 
@@ -278,11 +308,15 @@ final class HotkeyEventTap {
     /// Command+Left/Right/Up/Down is the standard Mac equivalent everywhere
     /// text editing works (Cocoa text views, and most apps that follow the
     /// platform convention). Shift rides along unchanged so Shift+Home/End
-    /// still extends the selection. Returns whether the event was remapped.
+    /// still extends the selection. "Control" here means whichever physical
+    /// key(s) are currently assigned the `.control` role (see
+    /// `ModifierKeys.swift`), not necessarily literal Control. Returns
+    /// whether the event was remapped.
     private func remapHomeEnd(keyCode: Int, flags: CGEventFlags, event: CGEvent) -> Bool {
         guard Preferences.shared.homeEndRemapEnabled else { return false }
 
-        let isDocument = flags.contains(.maskControl)
+        let controlSlots = Preferences.shared.slotsHeld(inBucket: .control, flags: flags)
+        let isDocument = !controlSlots.isEmpty
         let newKeyCode: Int
         switch keyCode {
         case kVK_Home: newKeyCode = isDocument ? kVK_UpArrow : kVK_LeftArrow
@@ -291,14 +325,21 @@ final class HotkeyEventTap {
         }
 
         event.setIntegerValueField(.keyboardEventKeycode, value: Int64(newKeyCode))
-        event.flags = flags.subtracting(.maskControl).union(.maskCommand)
+        // Strip exactly the contributing key(s)' bits (e.g. Right Option's
+        // .maskAlternate + its device bit, if that's what's configured as
+        // Control) rather than the fixed .maskControl this used to be —
+        // otherwise a repurposed key's own flag would ride along into the
+        // synthetic Command+Arrow event.
+        var newFlags = flags
+        for slot in controlSlots { newFlags.subtract(slot.flagBits) }
+        event.flags = newFlags.union(.maskCommand)
         return true
     }
 
     private func trackModifierTap(
-        event: CGEvent, mask: CGEventFlags, state: inout TapState, enabled: Bool, onTap: (() -> Void)?
+        event: CGEvent, bucket: ModifierBucket, state: inout TapState, enabled: Bool, onTap: (() -> Void)?
     ) {
-        let nowDown = event.flags.contains(mask)
+        let nowDown = Preferences.shared.isBucketHeld(bucket, in: event.flags)
         defer { state.isDown = nowDown }
 
         if nowDown && !state.isDown {

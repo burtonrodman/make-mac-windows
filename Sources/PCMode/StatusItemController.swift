@@ -1,12 +1,12 @@
 import Cocoa
 
 /// The menu-bar icon that will grow into the control center for every
-/// PCMode module (keyboard, mouse, window management). For now it offers
-/// the switcher's trigger, the tap-to-open-Spotlight toggles, the
-/// Option+Arrow window-snapping toggle, the Control+C/V remap toggle (plus
-/// a link to `SettingsWindowController` for managing its per-app
-/// exclusions), the Home/End line/document-navigation remap toggle, and
-/// Quit.
+/// PCMode module (keyboard, mouse, window management). For now it offers a
+/// link to `SettingsWindowController` (per-physical-key modifier role
+/// assignment, and the Control+C/V remap's per-app exclusions), the
+/// switcher's trigger, the tap-to-open-Spotlight toggles, the Option+Arrow
+/// window-snapping toggle, the Control+C/V remap toggle, the Home/End
+/// line/document-navigation remap toggle, and Quit.
 final class StatusItemController {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     private let triggerOffItem = NSMenuItem()
@@ -27,6 +27,14 @@ final class StatusItemController {
         }
 
         let menu = NSMenu()
+
+        let settingsItem = NSMenuItem(
+            title: "Modifier Keys & Settings…", action: #selector(showSettings), keyEquivalent: ""
+        )
+        settingsItem.target = self
+        menu.addItem(settingsItem)
+
+        menu.addItem(.separator())
 
         let triggerHeader = NSMenuItem(title: "Window Switcher", action: nil, keyEquivalent: "")
         triggerHeader.isEnabled = false
@@ -84,12 +92,6 @@ final class StatusItemController {
         ctrlCVRemapToggleItem.action = #selector(toggleCtrlCVRemap)
         ctrlCVRemapToggleItem.target = self
         menu.addItem(ctrlCVRemapToggleItem)
-
-        let manageExclusionsItem = NSMenuItem(
-            title: "Manage Excluded Apps…", action: #selector(showSettings), keyEquivalent: ""
-        )
-        manageExclusionsItem.target = self
-        menu.addItem(manageExclusionsItem)
 
         menu.addItem(.separator())
 

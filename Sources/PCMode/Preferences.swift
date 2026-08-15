@@ -14,13 +14,17 @@ enum SwitcherTrigger: String {
     case option
     case command
 
-    /// `nil` for `.off` — `HotkeyEventTap` treats a nil mask as "never
-    /// matches", so the switcher hotkey is simply never recognized.
-    var mask: CGEventFlags? {
+    /// `nil` for `.off` — `HotkeyEventTap` treats a nil bucket as "never
+    /// matches", so the switcher hotkey is simply never recognized. `.option`
+    /// resolves to the `.start` bucket (see `ModifierKeys.swift`) rather than
+    /// literal Option, so whichever physical key(s) are configured with the
+    /// Start role drive the switcher — by default that's Left Option only,
+    /// same as always, but it stays in sync if that assignment changes.
+    var bucket: ModifierBucket? {
         switch self {
         case .off: return nil
-        case .option: return .maskAlternate
-        case .command: return .maskCommand
+        case .option: return .start
+        case .command: return .command
         }
     }
 
