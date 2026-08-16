@@ -50,11 +50,13 @@ final class Preferences {
     private let homeEndRemapKey = "homeEndRemapEnabled"
     private let closeWindowShortcutKey = "closeWindowShortcutEnabled"
 
-    /// Bundle identifiers exempted from the Control+C/V remap below —
-    /// terminal emulators (where Control+C is SIGINT and Control+V can mean
-    /// "paste literally") and remote-desktop/VM consoles (where the literal
-    /// keystroke needs to reach the far end), seeded in on first launch.
-    /// User-editable in the Settings window (`SettingsWindowController`).
+    /// Bundle identifiers exempted from the Control+A/C/S/V remap below —
+    /// terminal emulators (where Control+A is readline's "beginning of
+    /// line", Control+C is SIGINT, Control+S is XOFF — freezes terminal
+    /// output until Control+Q — and Control+V can mean "paste literally")
+    /// and remote-desktop/VM consoles (where the literal keystroke needs to
+    /// reach the far end), seeded in on first launch. User-editable in the
+    /// Settings window (`SettingsWindowController`).
     static let defaultCtrlCVDenylist = [
         "com.apple.Terminal",
         "com.googlecode.iterm2",
@@ -136,19 +138,23 @@ final class Preferences {
         set { defaults.set(newValue, forKey: snapShortcutsKey) }
     }
 
-    /// Control+C / Control+V remapped to Command+C / Command+V, mirroring
-    /// Windows' copy/paste shortcuts. Defaults on, like the other shortcuts;
-    /// gated per-app by `ctrlCVDenylistBundleIDs` so it doesn't clobber
-    /// Control+C-as-SIGINT in terminals etc. See `HotkeyEventTap`.
+    /// Control+A/C/S/V remapped to Command+A/C/S/V, mirroring Windows'
+    /// select-all/copy/save/paste shortcuts. Defaults on, like the other
+    /// shortcuts; gated per-app by `ctrlCVDenylistBundleIDs` so it doesn't
+    /// clobber Control+C-as-SIGINT, Control+S-as-XOFF, etc. in terminals.
+    /// See `HotkeyEventTap`. (Named for the two shortcuts this started as —
+    /// kept as-is to avoid a settings-migration for what's still one
+    /// toggle covering a handful of closely-related keys.)
     var ctrlCVRemapEnabled: Bool {
         get { defaults.object(forKey: ctrlCVRemapKey) as? Bool ?? true }
         set { defaults.set(newValue, forKey: ctrlCVRemapKey) }
     }
 
-    /// Apps where Control+C/V passes through unmodified rather than being
-    /// remapped — see `defaultCtrlCVDenylist` for why these specific apps
-    /// need the literal keystroke. Falls back to that seed list until the
-    /// user (or `SettingsWindowController`) explicitly saves an edited one.
+    /// Apps where Control+A/C/S/V passes through unmodified rather than
+    /// being remapped — see `defaultCtrlCVDenylist` for why these specific
+    /// apps need the literal keystroke. Falls back to that seed list until
+    /// the user (or `SettingsWindowController`) explicitly saves an edited
+    /// one.
     var ctrlCVDenylistBundleIDs: [String] {
         get { defaults.array(forKey: ctrlCVDenylistKey) as? [String] ?? Self.defaultCtrlCVDenylist }
         set { defaults.set(newValue, forKey: ctrlCVDenylistKey) }

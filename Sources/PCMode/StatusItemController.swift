@@ -3,10 +3,10 @@ import Cocoa
 /// The menu-bar icon that will grow into the control center for every
 /// PCMode module (keyboard, mouse, window management). For now it offers a
 /// link to `SettingsWindowController` (per-physical-key modifier role
-/// assignment, and the Control+C/V remap's per-app exclusions), the
+/// assignment, and the Control+A/C/S/V remap's per-app exclusions), the
 /// switcher's trigger, the tap-to-open-Spotlight toggles, the Option+Arrow
 /// window-snapping toggle, a link to `SnapZonesWindowController` (per-monitor
-/// snap zone count/split), the Control+C/V remap toggle, the Home/End
+/// snap zone count/split), the Control+A/C/S/V remap toggle, the Home/End
 /// line/document-navigation remap toggle, the Command+F4 close-window
 /// toggle, and Quit.
 final class StatusItemController {
@@ -93,11 +93,11 @@ final class StatusItemController {
 
         menu.addItem(.separator())
 
-        let copyPasteHeader = NSMenuItem(title: "Copy / Paste", action: nil, keyEquivalent: "")
+        let copyPasteHeader = NSMenuItem(title: "Select All / Copy / Save / Paste", action: nil, keyEquivalent: "")
         copyPasteHeader.isEnabled = false
         menu.addItem(copyPasteHeader)
 
-        ctrlCVRemapToggleItem.title = "Control+C / Control+V → Command+C/V"
+        ctrlCVRemapToggleItem.title = "Control+A/C/S/V → Command+A/C/S/V"
         ctrlCVRemapToggleItem.action = #selector(toggleCtrlCVRemap)
         ctrlCVRemapToggleItem.target = self
         menu.addItem(ctrlCVRemapToggleItem)

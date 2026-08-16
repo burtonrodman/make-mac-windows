@@ -78,7 +78,7 @@ enum ModifierSlot: String, CaseIterable {
     /// still the Start-key), and the actual fix on the right: Right Option
     /// defaults to `.control` instead of joining the Start bundle, so it
     /// never fires window snap / the switcher / tap-for-Spotlight, and
-    /// instead powers Control+C/V and Ctrl+Home/End-style doc navigation —
+    /// instead powers Control+A/C/S/V and Ctrl+Home/End-style doc navigation —
     /// useful for the K860 (and any keyboard without a physical right
     /// Control key) without a global Option/Control swap.
     var defaultRole: ModifierRole {
@@ -103,7 +103,7 @@ enum ModifierSlot: String, CaseIterable {
 
 /// What a physical modifier key is treated as for the PCMode features that
 /// explicitly key off a modifier — the window switcher trigger, tap-alone-
-/// opens-Spotlight, window snap, the Control+C/V remap, and the Home/End
+/// opens-Spotlight, window snap, the Control+A/C/S/V remap, and the Home/End
 /// remap. This is purely internal to those features: it never changes what
 /// keystroke reaches other apps on its own (that's still literal Option/
 /// Control/Command everywhere else), and it's not a global remap — a key
@@ -118,7 +118,7 @@ enum ModifierRole: String, CaseIterable {
     /// (or +Left/Right) drives the window switcher, held+Arrow snaps the
     /// frontmost window.
     case start
-    /// Feeds the Control+C/V remap and the Control+Home/Control+End
+    /// Feeds the Control+A/C/S/V remap and the Control+Home/Control+End
     /// document-navigation branch of the Home/End remap.
     case control
     /// Feeds the Command-flavored switcher trigger and tap-for-Spotlight.
@@ -128,7 +128,7 @@ enum ModifierRole: String, CaseIterable {
         switch self {
         case .system: return "System (no special handling)"
         case .start: return "Start key (Spotlight tap, switcher, window snap)"
-        case .control: return "Control (Control+C/V, Control+Home/End)"
+        case .control: return "Control (Control+A/C/S/V, Control+Home/End)"
         case .command: return "Command (switcher, Spotlight tap)"
         }
     }
@@ -202,7 +202,7 @@ extension Preferences {
     /// All configured slots that are currently down and resolve into the
     /// given bucket — used where the caller needs to strip exactly the
     /// contributing key(s)' flag bits from a synthetic event (see
-    /// `HotkeyEventTap.remapHomeEnd` / `remapControlCopyPaste`).
+    /// `HotkeyEventTap.remapHomeEnd` / `remapControlShortcuts`).
     func slotsHeld(inBucket bucket: ModifierBucket, flags: CGEventFlags) -> [ModifierSlot] {
         ModifierSlot.allCases.filter { slot in
             slot.isDown(flags) && slot.bucket(for: role(for: slot)) == bucket

@@ -3,12 +3,12 @@ import UniformTypeIdentifiers
 
 /// PCMode's Settings window: which physical modifier key does what (see
 /// `ModifierKeys.swift`), and the "Manage Excluded Apps" list for the
-/// Control+C/V remap feature — shows and edits which apps are exempted from
-/// having their literal Control+C/V remapped to Command+C/V (see
-/// `HotkeyEventTap` and `Preferences.ctrlCVDenylistBundleIDs`). Terminal
+/// Control+A/C/S/V remap feature — shows and edits which apps are exempted
+/// from having their literal Control+A/C/S/V remapped to Command+A/C/S/V
+/// (see `HotkeyEventTap` and `Preferences.ctrlCVDenylistBundleIDs`). Terminal
 /// emulators and remote-desktop/VM consoles are seeded in by default, since
-/// they need the literal keystroke (SIGINT, raw paste-through, etc.) rather
-/// than Mac-style copy/paste.
+/// they need the literal keystroke (SIGINT, XOFF, raw paste-through, etc.)
+/// rather than Mac-style select-all/copy/save/paste.
 ///
 /// A plain programmatic `NSWindow` (no nib/storyboard), matching the rest of
 /// PCMode's UI (`SwitcherPanel`). Kept alive as a singleton so the window
@@ -97,7 +97,7 @@ final class SettingsWindowController: NSWindowController {
 
         let explanation = NSTextField(wrappingLabelWithString:
             "What each physical modifier key does for the shortcuts PCMode handles below " +
-                "— tap-for-Spotlight, the window switcher, window snap, Control+C/V, and " +
+                "— tap-for-Spotlight, the window switcher, window snap, Control+A/C/S/V, and " +
                 "Home/End navigation. This never changes what a key sends to other apps; " +
                 "it only changes which key(s) PCMode itself reacts to.")
         explanation.font = .systemFont(ofSize: 11)
@@ -160,14 +160,14 @@ final class SettingsWindowController: NSWindowController {
     }
 
     private func buildExcludedAppsSection() -> NSView {
-        let heading = NSTextField(labelWithString: "Apps Excluded from Control+C/V Remap")
+        let heading = NSTextField(labelWithString: "Apps Excluded from Control+A/C/S/V Remap")
         heading.font = .boldSystemFont(ofSize: 13)
 
         let explanation = NSTextField(wrappingLabelWithString:
-            "PCMode remaps Control+C and Control+V to Command+C/V everywhere except " +
+            "PCMode remaps Control+A/C/S/V to Command+A/C/S/V everywhere except " +
                 "the apps below — typically terminals and remote-desktop/VM consoles, " +
                 "where the literal keystroke needs to reach the app (e.g. Control+C as " +
-                "an interrupt signal).")
+                "an interrupt signal, or Control+S as an XOFF that freezes output).")
         explanation.font = .systemFont(ofSize: 11)
         explanation.textColor = .secondaryLabelColor
 

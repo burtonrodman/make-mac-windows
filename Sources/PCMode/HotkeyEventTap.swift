@@ -199,9 +199,9 @@ final class HotkeyEventTap {
                 return nil
             }
 
-            if remapControlCopyPaste(keyCode: keyCode, flags: flags, event: event) {
-                // Mutated in place to Cmd+C/V above — pass the same event
-                // through rather than swallowing it.
+            if remapControlShortcuts(keyCode: keyCode, flags: flags, event: event) {
+                // Mutated in place to Cmd+A/C/S/V above — pass the same
+                // event through rather than swallowing it.
                 return Unmanaged.passUnretained(event)
             }
 
@@ -284,21 +284,28 @@ final class HotkeyEventTap {
         return true
     }
 
-    /// Control+C / Control+V, remapped to Command+C / Command+V in place —
-    /// mirroring Windows' copy/paste shortcuts. Requires *bare* Control (no
-    /// Shift/Option/Command riding along), so it never touches Ctrl+Shift+C
-    /// (Inspect Element in every major browser) or any other Ctrl-based
-    /// combo. "Control" here means whichever physical key(s) are currently
-    /// assigned the `.control` role (see `ModifierKeys.swift`) — by default
-    /// Left Control plus Right Option, not necessarily literal Control.
-    /// Skipped entirely when the frontmost app is on
+    /// Control+A/C/S/V, remapped to Command+A/C/S/V in place — mirroring
+    /// Windows' select-all/copy/save/paste shortcuts. Requires *bare*
+    /// Control (no Shift/Option/Command riding along), so it never touches
+    /// Ctrl+Shift+C (Inspect Element in every major browser) or any other
+    /// Ctrl-based combo. "Control" here means whichever physical key(s) are
+    /// currently assigned the `.control` role (see `ModifierKeys.swift`) —
+    /// by default Left Control plus Right Option, not necessarily literal
+    /// Control. Skipped entirely when the frontmost app is on
     /// `Preferences.ctrlCVDenylistBundleIDs` — terminals need the literal
-    /// Control+C (SIGINT) and Control+V (raw paste), and remote-desktop/VM
-    /// consoles need the literal keystroke to reach the far end. Returns
-    /// whether the event was remapped.
-    private func remapControlCopyPaste(keyCode: Int, flags: CGEventFlags, event: CGEvent) -> Bool {
+    /// Control+A (readline's "beginning of line"), Control+C (SIGINT),
+    /// Control+S (XOFF — freezes terminal output until Control+Q, a classic
+    /// gotcha), and Control+V (raw paste); remote-desktop/VM consoles need
+    /// every one of these to reach the far end unaltered. Returns whether
+    /// the event was remapped.
+    private func remapControlShortcuts(keyCode: Int, flags: CGEventFlags, event: CGEvent) -> Bool {
         guard Preferences.shared.ctrlCVRemapEnabled else { return false }
-        guard keyCode == kVK_ANSI_C || keyCode == kVK_ANSI_V else { return false }
+        guard
+            keyCode == kVK_ANSI_A || keyCode == kVK_ANSI_C ||
+                keyCode == kVK_ANSI_S || keyCode == kVK_ANSI_V
+        else {
+            return false
+        }
 
         let controlSlots = Preferences.shared.slotsHeld(inBucket: .control, flags: flags)
         guard !controlSlots.isEmpty else { return false }
