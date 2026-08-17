@@ -24,7 +24,7 @@ enum WindowSnapper {
     /// snap zone on every monitor (`SnapZones.allZonesOrdered()`), wrapping
     /// around at either end — mirroring Windows' Win+Left/Right, generalized
     /// from a fixed left/right half to however many zones each monitor is
-    /// configured with (1-3; see `SnapZones`/`SnapZonesWindowController`).
+    /// configured with (1-3; see `SnapZones`/`SettingsWindowController`).
     ///
     /// If the window isn't currently sitting in any configured zone, the
     /// press snaps it into whichever zone on its *current* screen is

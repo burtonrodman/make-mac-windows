@@ -49,6 +49,8 @@ final class Preferences {
     private let ctrlCVDenylistKey = "ctrlCVDenylistBundleIDs"
     private let homeEndRemapKey = "homeEndRemapEnabled"
     private let closeWindowShortcutKey = "closeWindowShortcutEnabled"
+    private let perAppKeyRemapKey = "perAppKeyRemapEnabled"
+    private let perAppKeyRemapsKey = "perAppKeyRemapsV1"
 
     /// Bundle identifiers exempted from the Control+A/C/S/V remap below —
     /// terminal emulators (where Control+A is readline's "beginning of
@@ -128,7 +130,7 @@ final class Preferences {
     }
 
     /// Option+Left/Right cycles the frontmost window through the configured
-    /// snap zones (see `SnapZones`/`SnapZonesWindowController`) across every
+    /// snap zones (see `SnapZones`/`SettingsWindowController`) across every
     /// monitor; Option+Up/Down maximize/minimize — mirroring Windows'
     /// Win+Arrow shortcuts. Defaults on; independent of the window switcher
     /// (see `HotkeyEventTap.handleSnapKey` for how the two coexist when
@@ -176,6 +178,40 @@ final class Preferences {
     var closeWindowShortcutEnabled: Bool {
         get { defaults.object(forKey: closeWindowShortcutKey) as? Bool ?? true }
         set { defaults.set(newValue, forKey: closeWindowShortcutKey) }
+    }
+
+    /// Per-app literal-keystroke remaps — e.g. Chrome's Ctrl+H (History)
+    /// rewritten to its native Mac equivalent, Cmd+Y. Opt-in per app rather
+    /// than a denylist, since (unlike Control+A/C/S/V or Home/End) these
+    /// aren't a general editing convention but a specific app's own
+    /// shortcut. See `PerAppKeyRemap.swift` for the rule table and
+    /// `HotkeyEventTap.remapPerAppShortcut`. Defaults on, like the other
+    /// shortcuts.
+    var perAppKeyRemapEnabled: Bool {
+        get { defaults.object(forKey: perAppKeyRemapKey) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: perAppKeyRemapKey) }
+    }
+
+    /// The active per-app mapping list — seeded from
+    /// `PerAppKeyRemaps.defaultProfile` until the user (or
+    /// `SettingsWindowController`'s editor) explicitly saves an edited one,
+    /// same fallback pattern as `ctrlCVDenylistBundleIDs`. Stored as JSON
+    /// rather than a property-list-native type, since each entry is a small
+    /// struct (bundle ID + two keystrokes) rather than a single string.
+    var perAppKeyRemaps: [PerAppKeyRemap] {
+        get {
+            guard
+                let data = defaults.data(forKey: perAppKeyRemapsKey),
+                let decoded = try? JSONDecoder().decode([PerAppKeyRemap].self, from: data)
+            else {
+                return PerAppKeyRemaps.defaultProfile
+            }
+            return decoded
+        }
+        set {
+            guard let data = try? JSONEncoder().encode(newValue) else { return }
+            defaults.set(data, forKey: perAppKeyRemapsKey)
+        }
     }
 }
 

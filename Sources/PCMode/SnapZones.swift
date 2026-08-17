@@ -3,7 +3,7 @@ import Cocoa
 /// Model + persistence for snap zones: each monitor is divided into 1-3
 /// left-to-right zones — a generalization of the old fixed 50/50 left/right
 /// split — independently configurable per display and adjustable in
-/// `SnapZonesWindowController`. This file only knows how to compute zone
+/// `SettingsWindowController`. This file only knows how to compute zone
 /// rectangles from a display's configured split points and where those
 /// split points are stored; `WindowSnapper.cycleZone` is what actually
 /// moves a window in and out of them.

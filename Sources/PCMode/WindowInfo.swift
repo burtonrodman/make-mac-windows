@@ -20,6 +20,23 @@ struct WindowInfo {
         NSRunningApplication(processIdentifier: pid)?.icon
             ?? NSWorkspace.shared.icon(for: .application)
     }
+
+    /// A live-at-this-moment snapshot of the window's on-screen contents, for
+    /// the switcher's preview cards. `nil` without Screen Recording
+    /// permission (see `AppDelegate.requestScreenRecordingPermissionIfNeeded`)
+    /// or if the window has since closed — callers should fall back to
+    /// showing just the app icon in that case.
+    var previewImage: NSImage? {
+        guard let cgImage = CGWindowListCreateImage(
+            .null,
+            .optionIncludingWindow,
+            windowID,
+            [.boundsIgnoreFraming, .bestResolution]
+        ), cgImage.width > 0, cgImage.height > 0 else {
+            return nil
+        }
+        return NSImage(cgImage: cgImage, size: bounds.size)
+    }
 }
 
 enum WindowLister {

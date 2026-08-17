@@ -52,6 +52,13 @@ final class HotkeyEventTap {
     /// key-repeat, while held). `reverse` is true when Shift is also held,
     /// or the key is the Left arrow.
     var onTabDown: ((_ reverse: Bool) -> Void)?
+    /// Fired on trigger+Up/Down arrow (and repeats, from OS key-repeat)
+    /// while the switcher panel is already visible — moves the selection to
+    /// the same column in the row above/below, rather than cycling flatly
+    /// like Tab/Left/Right. Unlike `onTabDown`, this never fires with the
+    /// panel closed: there's no "row above" to move to before it's shown.
+    /// `down` is true for the Down arrow, false for Up.
+    var onVerticalMove: ((_ down: Bool) -> Void)?
     /// Fired when the trigger modifier is released — commits the selection.
     var onTriggerReleased: (() -> Void)?
     /// Fired on Escape while the trigger modifier is held — cancels.
@@ -211,6 +218,12 @@ final class HotkeyEventTap {
                 return Unmanaged.passUnretained(event)
             }
 
+            if remapPerAppShortcut(keyCode: keyCode, flags: flags, event: event) {
+                // Mutated in place to the target keystroke above — pass the
+                // same event through rather than swallowing it.
+                return Unmanaged.passUnretained(event)
+            }
+
             if let triggerBucket = Preferences.shared.switcherTrigger.bucket {
                 let triggerHeld = Preferences.shared.isBucketHeld(triggerBucket, in: flags)
                 if keyCode == kVK_Tab, triggerHeld {
@@ -225,6 +238,16 @@ final class HotkeyEventTap {
                 }
                 if keyCode == kVK_RightArrow, triggerHeld {
                     onTabDown?(false)
+                    return nil
+                }
+                // Up/Down move between rows of the preview grid, but only
+                // once it's already showing — see `onVerticalMove`.
+                if keyCode == kVK_UpArrow, triggerHeld, isSwitcherVisible?() ?? false {
+                    onVerticalMove?(false)
+                    return nil
+                }
+                if keyCode == kVK_DownArrow, triggerHeld, isSwitcherVisible?() ?? false {
+                    onVerticalMove?(true)
                     return nil
                 }
             }
@@ -243,12 +266,13 @@ final class HotkeyEventTap {
     /// whatever it's assigned instead. Returns whether the event was
     /// consumed.
     ///
-    /// This only ever collides with the switcher's own arrow-cycling (see
+    /// This only ever collides with the switcher's own arrow navigation (see
     /// `handle(type:event:)`) when the switcher trigger is *also* the Start
     /// bucket — in that case, whichever behavior applies depends on whether
     /// the switcher panel is already up: mid trigger+Tab gesture, Left/Right
-    /// keep cycling it (returns false here, so the trigger-bucket branch
-    /// below handles it instead); otherwise they snap.
+    /// keep cycling it and Up/Down move between rows (returns false here, so
+    /// the trigger-bucket branch below handles it instead); otherwise they
+    /// snap.
     private func handleSnapKey(keyCode: Int, flags: CGEventFlags) -> Bool {
         guard
             Preferences.shared.snapShortcutsEnabled,
@@ -367,6 +391,31 @@ final class HotkeyEventTap {
         var newFlags = flags
         for slot in controlSlots { newFlags.subtract(slot.flagBits) }
         event.flags = newFlags.union(.maskCommand)
+        return true
+    }
+
+    /// Per-app literal-keystroke remaps (see `PerAppKeyRemap`) — e.g.
+    /// Chrome's Ctrl+H rewritten to Cmd+Y. Unlike
+    /// `remapControlShortcuts`/`remapHomeEnd`, which key off PCMode's
+    /// reassignable Control role, these match a literal physical key
+    /// (optionally left/right/either — see `ModifierRequirement`), since
+    /// they're standing in for one specific app's actual keyboard shortcut
+    /// rather than a general editing convention. Returns whether the event
+    /// was remapped.
+    private func remapPerAppShortcut(keyCode: Int, flags: CGEventFlags, event: CGEvent) -> Bool {
+        guard Preferences.shared.perAppKeyRemapEnabled else { return false }
+        guard let bundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier else { return false }
+
+        guard
+            let rule = Preferences.shared.perAppKeyRemaps.first(where: {
+                $0.bundleID == bundleID && $0.fromKeyCode == keyCode && $0.matchesModifiers(flags)
+            })
+        else {
+            return false
+        }
+
+        event.setIntegerValueField(.keyboardEventKeycode, value: Int64(rule.toKeyCode))
+        event.flags = rule.toFlags
         return true
     }
 

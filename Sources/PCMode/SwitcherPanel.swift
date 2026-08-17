@@ -1,29 +1,90 @@
 import Cocoa
 
 /// The on-screen HUD shown while the trigger modifier is held after
-/// trigger+Tab — a translucent strip of app icons plus a caption calling out
-/// the currently selected window's title, mirroring the visual language of
-/// macOS's own Cmd+Tab bar (icons + a single caption for the selection)
-/// but at per-window granularity.
+/// trigger+Tab — a translucent strip of live window preview thumbnails, each
+/// badged with its app icon and labeled with its own icon + window title,
+/// plus a larger caption below the whole grid calling out the currently
+/// selected window, mirroring the visual language of macOS's own Cmd+Tab bar
+/// but at per-window granularity, and closer to Windows' Alt+Tab in showing
+/// the window's actual contents rather than just its app icon.
 final class SwitcherPanel: NSPanel {
-    private static let iconSize: CGFloat = 128
-    private static let cellPadding: CGFloat = 1
     private static let panelCornerRadius: CGFloat = 28
-    // macOS's own app icon artwork is already a squircle at roughly 22% of
-    // its size (128 * 0.2237 ≈ 28.6) — matching that here, rather than a
-    // tighter/boxier radius, is what makes the highlight look like it's
-    // hugging the icon's actual shape instead of a mismatched rounded rect.
-    private static let cellCornerRadius: CGFloat = 28
-    private static let itemSpacing: CGFloat = 16
-    private static let outerHorizontalInset: CGFloat = 32
+
+    /// All the sizing that scales with the active screen — a scale of 1.0
+    /// reproduces the original fixed sizing (tuned by eye on a QHD or larger
+    /// display), and everything shrinks together below that. Without this,
+    /// the previews stayed a fixed 420pt wide everywhere: fine on a QHD
+    /// ultrawide, but 2-3 huge thumbnails on a laptop screen — most commonly
+    /// hit viewing over Screen Sharing while the Mac's usual ultrawide
+    /// monitors are physically detached and it falls back to a
+    /// laptop-sized virtual display.
+    private struct Layout {
+        let previewWidth: CGFloat
+        let previewHeight: CGFloat
+        let cellPadding: CGFloat
+        let cellCornerRadius: CGFloat
+        let badgeSize: CGFloat
+        let captionIconSize: CGFloat
+        let captionSpacing: CGFloat
+        let itemSpacing: CGFloat
+        let outerHorizontalInset: CGFloat
+        let outerTopInset: CGFloat
+        let outerBottomInset: CGFloat
+        let outerStackSpacing: CGFloat
+        let cellCaptionFontSize: CGFloat
+        let bigCaptionFontSize: CGFloat
+
+        init(scale: CGFloat) {
+            previewWidth = 420 * scale
+            previewHeight = 276 * scale
+            cellCornerRadius = 24 * scale
+            // Floors below keep padding/spacing/text from disappearing
+            // entirely at the low end of the scale range rather than
+            // shrinking in exact proportion to the thumbnails.
+            cellPadding = max(6, 12 * scale)
+            badgeSize = max(28, 50 * scale)
+            captionIconSize = max(14, 18 * scale)
+            captionSpacing = 8 * scale
+            itemSpacing = max(8, 16 * scale)
+            outerHorizontalInset = max(16, 32 * scale)
+            outerTopInset = max(16, 28 * scale)
+            outerBottomInset = max(14, 24 * scale)
+            outerStackSpacing = max(10, 16 * scale)
+            cellCaptionFontSize = max(10, 12 * scale)
+            bigCaptionFontSize = max(11, 14 * scale)
+        }
+
+        /// Estimated non-grid chrome height (outer insets, the spacing down
+        /// to the caption, and the caption's own line height) — used to cap
+        /// the grid's visible height to what actually fits the screen.
+        var chromeHeight: CGFloat {
+            outerTopInset + outerBottomInset + outerStackSpacing + bigCaptionFontSize + 6
+        }
+    }
 
     /// Vertical container of row NSStackViews — the grid wraps into
     /// multiple centered rows instead of growing past the screen edge when
     /// there are a lot of windows open.
     private let grid = NSStackView()
+    /// Hosts `grid` as its document view so the grid can scroll vertically
+    /// once it's taller than fits on the active screen — the width already
+    /// wraps to fit (see `windowRows`), but a smaller screen (e.g. a laptop
+    /// viewed over Screen Sharing while its usual ultrawide monitors are
+    /// detached) can still produce more rows than fit vertically even after
+    /// scaling down.
+    private let scrollView = NSScrollView()
     private let captionLabel = NSTextField(labelWithString: "")
+    private let outerStack = NSStackView()
     private var cellViews: [NSView] = []
     private var windows: [WindowInfo] = []
+    private var layout = Layout(scale: 1.0)
+    private var scrollViewWidthConstraint: NSLayoutConstraint?
+    private var scrollViewHeightConstraint: NSLayoutConstraint?
+    /// The flat-index range each displayed row spans, in display order —
+    /// e.g. `[0..<4, 4..<7]` for a 4-then-3 wrap. Lets `indexMovingVertically`
+    /// map Up/Down arrow presses onto the same visual column in the row
+    /// above/below.
+    private var rowRanges: [Range<Int>] = []
 
     convenience init() {
         self.init(
@@ -63,26 +124,43 @@ final class SwitcherPanel: NSPanel {
 
         grid.orientation = .vertical
         grid.alignment = .centerX
-        grid.spacing = Self.itemSpacing
-        grid.translatesAutoresizingMaskIntoConstraints = false
+        grid.spacing = layout.itemSpacing
+        // `grid` is sized by hand each rebuild (see `rebuild(windows:screen:)`)
+        // to its own fitting size, since it's used as a scroll view's
+        // document view rather than an Auto-Layout-managed arranged subview.
 
-        captionLabel.font = .systemFont(ofSize: 14, weight: .medium)
+        scrollView.documentView = grid
+        scrollView.drawsBackground = false
+        scrollView.hasVerticalScroller = true
+        scrollView.autohidesScrollers = true
+        scrollView.borderType = .noBorder
+        scrollView.verticalScrollElasticity = .allowed
+        scrollView.horizontalScrollElasticity = .none
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+
+        captionLabel.font = .systemFont(ofSize: layout.bigCaptionFontSize, weight: .medium)
         captionLabel.alignment = .center
         captionLabel.lineBreakMode = .byTruncatingTail
         captionLabel.textColor = .labelColor
         captionLabel.translatesAutoresizingMaskIntoConstraints = false
         captionLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-        let outerStack = NSStackView(views: [grid, captionLabel])
+        outerStack.addArrangedSubview(scrollView)
+        outerStack.addArrangedSubview(captionLabel)
         outerStack.orientation = .vertical
         outerStack.alignment = .centerX
-        outerStack.spacing = 16
+        outerStack.spacing = layout.outerStackSpacing
         outerStack.edgeInsets = NSEdgeInsets(
-            top: 28, left: Self.outerHorizontalInset, bottom: 24, right: Self.outerHorizontalInset
+            top: layout.outerTopInset, left: layout.outerHorizontalInset,
+            bottom: layout.outerBottomInset, right: layout.outerHorizontalInset
         )
         outerStack.translatesAutoresizingMaskIntoConstraints = false
 
         visualEffect.addSubview(outerStack)
+        let scrollViewWidthConstraint = scrollView.widthAnchor.constraint(equalToConstant: 0)
+        let scrollViewHeightConstraint = scrollView.heightAnchor.constraint(equalToConstant: 0)
+        self.scrollViewWidthConstraint = scrollViewWidthConstraint
+        self.scrollViewHeightConstraint = scrollViewHeightConstraint
         NSLayoutConstraint.activate([
             outerStack.topAnchor.constraint(equalTo: visualEffect.topAnchor),
             outerStack.bottomAnchor.constraint(equalTo: visualEffect.bottomAnchor),
@@ -92,15 +170,18 @@ final class SwitcherPanel: NSPanel {
             // the icon grid's) so a long title truncates instead of forcing
             // the panel wider or running edge-to-edge.
             captionLabel.widthAnchor.constraint(lessThanOrEqualTo: visualEffect.widthAnchor, multiplier: 0.8),
+            scrollViewWidthConstraint,
+            scrollViewHeightConstraint,
         ])
 
         contentView = visualEffect
     }
 
     func show(windows: [WindowInfo], selectedIndex: Int) {
-        rebuild(windows: windows)
+        let screen = NSScreen.main
+        rebuild(windows: windows, screen: screen)
         updateSelection(selectedIndex)
-        centerOnActiveScreen()
+        centerOnActiveScreen(screen)
         orderFrontRegardless()
     }
 
@@ -116,7 +197,29 @@ final class SwitcherPanel: NSPanel {
         }
         if windows.indices.contains(index) {
             captionLabel.stringValue = caption(for: windows[index])
+            // Keep the selection in view as Tab/arrow keys move it past the
+            // edge of whatever's currently scrolled into the visible area.
+            cellViews[index].scrollToVisible(cellViews[index].bounds)
         }
+    }
+
+    /// The flat index landed on by moving up/down one row from `index`,
+    /// preserving the same column (clamped to the destination row's width,
+    /// for when rows are uneven) and wrapping from the last row back to the
+    /// first — mirroring how Tab/Left-Right already wrap around the whole
+    /// list. Returns `index` unchanged when there's only one row.
+    func indexMovingVertically(from index: Int, down: Bool) -> Int {
+        guard
+            rowRanges.count > 1,
+            let currentRow = rowRanges.firstIndex(where: { $0.contains(index) })
+        else {
+            return index
+        }
+
+        let newRow = (currentRow + (down ? 1 : -1) + rowRanges.count) % rowRanges.count
+        let column = index - rowRanges[currentRow].lowerBound
+        let targetRow = rowRanges[newRow]
+        return min(targetRow.lowerBound + column, targetRow.upperBound - 1)
     }
 
     /// "AppName — Window Title", falling back to just the app name when the
@@ -134,8 +237,33 @@ final class SwitcherPanel: NSPanel {
         return "\(window.ownerName) — \(title)"
     }
 
-    private func rebuild(windows: [WindowInfo]) {
+    /// How much to shrink the base (QHD-tuned) sizing for the given screen.
+    /// 1.0 (no shrinking) is kept for anything QHD-sized or larger —
+    /// including an ultrawide, since its extra width doesn't need extra
+    /// preview size, just more columns. Below that, previews shrink roughly
+    /// in step with the screen so a laptop display (commonly what's actually
+    /// driving the panel when viewing over Screen Sharing, since the Mac's
+    /// own ultrawide monitors are physically detached) gets proportionally
+    /// smaller thumbnails instead of the same giant ones wrapped into more
+    /// rows.
+    private static func scaleFactor(for screen: NSScreen?) -> CGFloat {
+        let visible = screen?.visibleFrame.size ?? NSSize(width: 2560, height: 1440)
+        let widthScale = visible.width / 2400
+        let heightScale = visible.height / 1350
+        return min(1.0, max(0.6, min(widthScale, heightScale)))
+    }
+
+    private func rebuild(windows: [WindowInfo], screen: NSScreen?) {
         self.windows = windows
+        layout = Layout(scale: Self.scaleFactor(for: screen))
+
+        grid.spacing = layout.itemSpacing
+        outerStack.spacing = layout.outerStackSpacing
+        outerStack.edgeInsets = NSEdgeInsets(
+            top: layout.outerTopInset, left: layout.outerHorizontalInset,
+            bottom: layout.outerBottomInset, right: layout.outerHorizontalInset
+        )
+        captionLabel.font = .systemFont(ofSize: layout.bigCaptionFontSize, weight: .medium)
 
         grid.arrangedSubviews.forEach {
             grid.removeArrangedSubview($0)
@@ -143,37 +271,61 @@ final class SwitcherPanel: NSPanel {
         }
 
         cellViews = []
-        for row in windowRows(for: windows) {
+        rowRanges = []
+        for row in windowRows(for: windows, screen: screen) {
             let rowStack = NSStackView()
             rowStack.orientation = .horizontal
-            rowStack.spacing = Self.itemSpacing
+            rowStack.spacing = layout.itemSpacing
 
             let rowCells = row.map(makeCell)
             rowCells.forEach { rowStack.addArrangedSubview($0) }
+            let rowStart = cellViews.count
             cellViews.append(contentsOf: rowCells)
+            rowRanges.append(rowStart..<cellViews.count)
 
             grid.addArrangedSubview(rowStack)
         }
 
-        contentView?.layoutSubtreeIfNeeded()
+        grid.layoutSubtreeIfNeeded()
+        let gridSize = grid.fittingSize
+        // The document view of a scroll view is sized by hand, not by Auto
+        // Layout — give it its full natural size regardless of how much of
+        // that ends up visible through the (possibly shorter) scroll view.
+        grid.frame = NSRect(origin: .zero, size: gridSize)
+
+        // Cap how tall the grid's *visible* area gets to whatever fits the
+        // active screen, so a lot of wrapped rows scrolls instead of running
+        // the panel off the top/bottom.
+        let screenHeight = screen?.visibleFrame.height ?? 800
+        let maxGridHeight = max(layout.previewHeight, screenHeight * 0.9 - layout.chromeHeight)
+        let visibleGridHeight = min(gridSize.height, maxGridHeight)
+
+        scrollViewWidthConstraint?.constant = gridSize.width
+        scrollViewHeightConstraint?.constant = visibleGridHeight
 
         var newFrame = frame
         newFrame.size = NSSize(
-            width: max(280, grid.fittingSize.width + Self.outerHorizontalInset * 2),
-            height: max(180, grid.fittingSize.height + 88)
+            width: max(280, gridSize.width + layout.outerHorizontalInset * 2),
+            height: max(180, visibleGridHeight + layout.chromeHeight)
         )
         setFrame(newFrame, display: false)
     }
 
     /// Chunks the window list into rows sized to fit within the active
     /// screen's width, so the panel wraps instead of running off-screen when
-    /// a lot of windows are open.
-    private func windowRows(for windows: [WindowInfo]) -> [[WindowInfo]] {
-        let screenWidth = NSScreen.main?.visibleFrame.width ?? 1200
-        let maxRowWidth = screenWidth * 0.9 - Self.outerHorizontalInset * 2
-        let cellWidth = Self.iconSize + Self.cellPadding * 2
+    /// a lot of windows are open. Once wrapping is needed, rows are balanced
+    /// as evenly as possible (e.g. 4+3 for 7 windows) rather than greedily
+    /// filling earlier rows to the max and leaving a sparse final row (6+1).
+    private func windowRows(for windows: [WindowInfo], screen: NSScreen?) -> [[WindowInfo]] {
+        let screenWidth = screen?.visibleFrame.width ?? 1200
+        let maxRowWidth = screenWidth * 0.9 - layout.outerHorizontalInset * 2
+        let cellWidth = layout.previewWidth + layout.cellPadding * 2
 
-        let columns = max(1, Int((maxRowWidth + Self.itemSpacing) / (cellWidth + Self.itemSpacing)))
+        let maxColumns = max(1, Int((maxRowWidth + layout.itemSpacing) / (cellWidth + layout.itemSpacing)))
+        guard windows.count > maxColumns else { return [windows] }
+
+        let rowCount = Int(ceil(Double(windows.count) / Double(maxColumns)))
+        let columns = Int(ceil(Double(windows.count) / Double(rowCount)))
 
         return stride(from: 0, to: windows.count, by: columns).map {
             Array(windows[$0..<min($0 + columns, windows.count)])
@@ -181,30 +333,114 @@ final class SwitcherPanel: NSPanel {
     }
 
     private func makeCell(for window: WindowInfo) -> NSView {
+        // `container` is what the selection highlight paints onto (see
+        // `updateSelection`) — its own corner radius is a touch larger than
+        // `content`'s so the highlight reads as a consistent margin around
+        // the thumbnail rather than two mismatched rounded rects. It
+        // deliberately does *not* mask its bounds, so the app-icon badge can
+        // overhang the thumbnail's corner without getting clipped.
         let container = NSView()
         container.wantsLayer = true
-        container.layer?.cornerRadius = Self.cellCornerRadius
+        container.layer?.cornerRadius = layout.cellCornerRadius + layout.cellPadding
         container.layer?.cornerCurve = .continuous
 
-        let imageView = NSImageView(image: window.icon)
-        imageView.imageScaling = .scaleProportionallyUpOrDown
+        let content = NSView()
+        content.wantsLayer = true
+        content.layer?.cornerRadius = layout.cellCornerRadius
+        content.layer?.cornerCurve = .continuous
+        content.layer?.masksToBounds = true
+        content.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.2).cgColor
+        content.translatesAutoresizingMaskIntoConstraints = false
+
+        let imageView = NSImageView()
         imageView.translatesAutoresizingMaskIntoConstraints = false
 
-        container.addSubview(imageView)
+        // Live window contents when we have Screen Recording permission;
+        // otherwise fall back to just the app icon, centered and inset, as
+        // PCMode's v1 switcher always did.
+        let preview = window.previewImage
+        imageView.image = preview ?? window.icon
+        imageView.imageScaling = preview != nil ? .scaleProportionallyUpOrDown : .scaleProportionallyDown
+
+        // Small icon + window title, centered under the thumbnail — mirrors
+        // the badge's app icon but names the specific window, since a busy
+        // app can have several tiles in view at once with only their titles
+        // to tell them apart.
+        let captionIcon = NSImageView(image: window.icon)
+        captionIcon.translatesAutoresizingMaskIntoConstraints = false
+
+        let captionTitle = NSTextField(labelWithString: window.displayName)
+        captionTitle.font = .systemFont(ofSize: layout.cellCaptionFontSize)
+        captionTitle.textColor = .labelColor
+        captionTitle.lineBreakMode = .byTruncatingTail
+        captionTitle.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        captionTitle.translatesAutoresizingMaskIntoConstraints = false
+
+        let captionRow = NSStackView(views: [captionIcon, captionTitle])
+        captionRow.orientation = .horizontal
+        captionRow.alignment = .centerY
+        captionRow.spacing = 6
+        captionRow.translatesAutoresizingMaskIntoConstraints = false
+
+        content.addSubview(imageView)
+        container.addSubview(content)
+        container.addSubview(captionRow)
         NSLayoutConstraint.activate([
-            imageView.topAnchor.constraint(equalTo: container.topAnchor, constant: Self.cellPadding),
-            imageView.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -Self.cellPadding),
-            imageView.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: Self.cellPadding),
-            imageView.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -Self.cellPadding),
-            imageView.widthAnchor.constraint(equalToConstant: Self.iconSize),
-            imageView.heightAnchor.constraint(equalToConstant: Self.iconSize),
+            content.topAnchor.constraint(equalTo: container.topAnchor, constant: layout.cellPadding),
+            content.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: layout.cellPadding),
+            content.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -layout.cellPadding),
+            content.widthAnchor.constraint(equalToConstant: layout.previewWidth),
+            content.heightAnchor.constraint(equalToConstant: layout.previewHeight),
+
+            imageView.topAnchor.constraint(equalTo: content.topAnchor),
+            imageView.bottomAnchor.constraint(equalTo: content.bottomAnchor),
+            imageView.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+            imageView.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+
+            captionIcon.widthAnchor.constraint(equalToConstant: layout.captionIconSize),
+            captionIcon.heightAnchor.constraint(equalToConstant: layout.captionIconSize),
+
+            // Centered rather than stretched to the thumbnail's full width,
+            // so a short title doesn't leave the icon stranded off to one
+            // side — but capped to that width so a long one truncates
+            // instead of widening the cell.
+            captionRow.topAnchor.constraint(equalTo: content.bottomAnchor, constant: layout.captionSpacing),
+            captionRow.centerXAnchor.constraint(equalTo: content.centerXAnchor),
+            captionRow.widthAnchor.constraint(lessThanOrEqualTo: content.widthAnchor),
+            captionRow.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -layout.cellPadding),
         ])
+
+        // Badge the thumbnail with the owning app's icon (bottom-trailing
+        // corner, half-overhanging like a Dock/notification badge) so a
+        // window is still identifiable by app at a glance. Skipped when
+        // there's no real thumbnail, since the fallback *is* the app icon.
+        if preview != nil {
+            let badge = NSImageView(image: window.icon)
+            badge.wantsLayer = true
+            badge.layer?.shadowColor = NSColor.black.cgColor
+            badge.layer?.shadowOpacity = 0.5
+            badge.layer?.shadowRadius = 2
+            badge.layer?.shadowOffset = .zero
+            badge.translatesAutoresizingMaskIntoConstraints = false
+
+            container.addSubview(badge)
+            NSLayoutConstraint.activate([
+                badge.widthAnchor.constraint(equalToConstant: layout.badgeSize),
+                badge.heightAnchor.constraint(equalToConstant: layout.badgeSize),
+                badge.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: 4),
+                badge.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: 4),
+            ])
+        }
+
         return container
     }
 
-    private func centerOnActiveScreen() {
-        guard let screen = NSScreen.main else { return }
-        let screenFrame = screen.frame
+    private func centerOnActiveScreen(_ screen: NSScreen?) {
+        // visibleFrame (not frame) so the panel centers within the area not
+        // covered by the menu bar/Dock — on a smaller screen those eat a
+        // proportionally bigger bite, and the grid height above is already
+        // capped against this same visibleFrame.
+        guard let screenFrame = screen?.visibleFrame else { return }
         setFrameOrigin(NSPoint(
             x: screenFrame.midX - frame.width / 2,
             y: screenFrame.midY - frame.height / 2

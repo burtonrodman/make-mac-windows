@@ -17,6 +17,9 @@ final class SwitcherController {
         HotkeyEventTap.shared.onTabDown = { [weak self] reverse in
             self?.handleTab(reverse: reverse)
         }
+        HotkeyEventTap.shared.onVerticalMove = { [weak self] down in
+            self?.handleVertical(down: down)
+        }
         HotkeyEventTap.shared.onTriggerReleased = { [weak self] in
             self?.commit()
         }
@@ -42,6 +45,15 @@ final class SwitcherController {
             selectedIndex = (selectedIndex + (reverse ? -1 : 1) + windows.count) % windows.count
             panel.updateSelection(selectedIndex)
         }
+    }
+
+    /// Moves the selection to the same column in the row above/below,
+    /// wrapping top-to-bottom — only meaningful once the panel is already
+    /// showing (`HotkeyEventTap` doesn't fire this otherwise).
+    private func handleVertical(down: Bool) {
+        guard panel.isVisible, !windows.isEmpty else { return }
+        selectedIndex = panel.indexMovingVertically(from: selectedIndex, down: down)
+        panel.updateSelection(selectedIndex)
     }
 
     private func commit() {

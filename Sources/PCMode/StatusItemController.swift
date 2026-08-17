@@ -2,13 +2,13 @@ import Cocoa
 
 /// The menu-bar icon that will grow into the control center for every
 /// PCMode module (keyboard, mouse, window management). For now it offers a
-/// link to `SettingsWindowController` (per-physical-key modifier role
-/// assignment, and the Control+A/C/S/V remap's per-app exclusions), the
-/// switcher's trigger, the tap-to-open-Spotlight toggles, the Option+Arrow
-/// window-snapping toggle, a link to `SnapZonesWindowController` (per-monitor
-/// snap zone count/split), the Control+A/C/S/V remap toggle, the Home/End
-/// line/document-navigation remap toggle, the Command+F4 close-window
-/// toggle, and Quit.
+/// link to `SettingsWindowController` — one tab apiece for per-physical-key
+/// modifier role assignment, the Control+A/C/S/V remap's per-app exclusions,
+/// per-app key mappings, and the Option+Arrow snap/cycle toggle plus its
+/// per-monitor zone editor — the switcher's trigger, the
+/// tap-to-open-Spotlight toggles, the Control+A/C/S/V remap toggle, the
+/// Home/End line/document-navigation remap toggle, the Command+F4
+/// close-window toggle, and Quit.
 final class StatusItemController {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     private let triggerOffItem = NSMenuItem()
@@ -16,7 +16,6 @@ final class StatusItemController {
     private let triggerCommandItem = NSMenuItem()
     private let optionSpotlightToggleItem = NSMenuItem()
     private let commandSpotlightToggleItem = NSMenuItem()
-    private let snapShortcutsToggleItem = NSMenuItem()
     private let ctrlCVRemapToggleItem = NSMenuItem()
     private let homeEndRemapToggleItem = NSMenuItem()
     private let closeWindowToggleItem = NSMenuItem()
@@ -32,7 +31,7 @@ final class StatusItemController {
         let menu = NSMenu()
 
         let settingsItem = NSMenuItem(
-            title: "Modifier Keys & Settings…", action: #selector(showSettings), keyEquivalent: ""
+            title: "Settings…", action: #selector(showSettings), keyEquivalent: ""
         )
         settingsItem.target = self
         menu.addItem(settingsItem)
@@ -73,23 +72,6 @@ final class StatusItemController {
         commandSpotlightToggleItem.action = #selector(toggleCommandTapSpotlight)
         commandSpotlightToggleItem.target = self
         menu.addItem(commandSpotlightToggleItem)
-
-        menu.addItem(.separator())
-
-        let snapHeader = NSMenuItem(title: "Snap Windows", action: nil, keyEquivalent: "")
-        snapHeader.isEnabled = false
-        menu.addItem(snapHeader)
-
-        snapShortcutsToggleItem.title = "Option + Arrow Snaps/Cycles Windows"
-        snapShortcutsToggleItem.action = #selector(toggleSnapShortcuts)
-        snapShortcutsToggleItem.target = self
-        menu.addItem(snapShortcutsToggleItem)
-
-        let snapZonesItem = NSMenuItem(
-            title: "Snap Zones…", action: #selector(showSnapZones), keyEquivalent: ""
-        )
-        snapZonesItem.target = self
-        menu.addItem(snapZonesItem)
 
         menu.addItem(.separator())
 
@@ -160,11 +142,6 @@ final class StatusItemController {
         updateCheckmarks()
     }
 
-    @objc private func toggleSnapShortcuts() {
-        Preferences.shared.snapShortcutsEnabled.toggle()
-        updateCheckmarks()
-    }
-
     @objc private func toggleCtrlCVRemap() {
         Preferences.shared.ctrlCVRemapEnabled.toggle()
         updateCheckmarks()
@@ -184,10 +161,6 @@ final class StatusItemController {
         SettingsWindowController.shared.show()
     }
 
-    @objc private func showSnapZones() {
-        SnapZonesWindowController.shared.show()
-    }
-
     private func updateCheckmarks() {
         let current = Preferences.shared.switcherTrigger
         triggerOffItem.state = current == .off ? .on : .off
@@ -196,7 +169,6 @@ final class StatusItemController {
 
         optionSpotlightToggleItem.state = Preferences.shared.optionTapOpensSpotlight ? .on : .off
         commandSpotlightToggleItem.state = Preferences.shared.commandTapOpensSpotlight ? .on : .off
-        snapShortcutsToggleItem.state = Preferences.shared.snapShortcutsEnabled ? .on : .off
         ctrlCVRemapToggleItem.state = Preferences.shared.ctrlCVRemapEnabled ? .on : .off
         homeEndRemapToggleItem.state = Preferences.shared.homeEndRemapEnabled ? .on : .off
         closeWindowToggleItem.state = Preferences.shared.closeWindowShortcutEnabled ? .on : .off
