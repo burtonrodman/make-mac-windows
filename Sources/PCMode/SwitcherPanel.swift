@@ -356,11 +356,12 @@ final class SwitcherPanel: NSPanel {
         imageView.translatesAutoresizingMaskIntoConstraints = false
 
         // Live window contents when we have Screen Recording permission;
-        // otherwise fall back to just the app icon, centered and inset, as
-        // PCMode's v1 switcher always did.
+        // otherwise fall back to just the app icon, scaled up to fill the
+        // same cell a thumbnail would (rather than sitting at its native
+        // ~128pt size, dwarfed by the surrounding cell).
         let preview = window.previewImage
         imageView.image = preview ?? window.icon
-        imageView.imageScaling = preview != nil ? .scaleProportionallyUpOrDown : .scaleProportionallyDown
+        imageView.imageScaling = .scaleProportionallyUpOrDown
 
         // Small icon + window title, centered under the thumbnail — mirrors
         // the badge's app icon but names the specific window, since a busy

@@ -8,7 +8,7 @@ import Cocoa
 /// per-monitor zone editor — the switcher's trigger, the
 /// tap-to-open-Spotlight toggles, the Control+A/C/S/V remap toggle, the
 /// Home/End line/document-navigation remap toggle, the Command+F4
-/// close-window toggle, and Quit.
+/// close-window toggle, the Control+F4-closes-tab toggle, and Quit.
 final class StatusItemController {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     private let triggerOffItem = NSMenuItem()
@@ -19,6 +19,7 @@ final class StatusItemController {
     private let ctrlCVRemapToggleItem = NSMenuItem()
     private let homeEndRemapToggleItem = NSMenuItem()
     private let closeWindowToggleItem = NSMenuItem()
+    private let ctrlF4ToggleItem = NSMenuItem()
 
     func setup() {
         if let button = statusItem.button {
@@ -97,7 +98,7 @@ final class StatusItemController {
 
         menu.addItem(.separator())
 
-        let closeWindowHeader = NSMenuItem(title: "Close Window", action: nil, keyEquivalent: "")
+        let closeWindowHeader = NSMenuItem(title: "Close Window / Tab", action: nil, keyEquivalent: "")
         closeWindowHeader.isEnabled = false
         menu.addItem(closeWindowHeader)
 
@@ -105,6 +106,11 @@ final class StatusItemController {
         closeWindowToggleItem.action = #selector(toggleCloseWindowShortcut)
         closeWindowToggleItem.target = self
         menu.addItem(closeWindowToggleItem)
+
+        ctrlF4ToggleItem.title = "Control + F4 → Command+W (Closes Tab)"
+        ctrlF4ToggleItem.action = #selector(toggleCtrlF4ClosesTab)
+        ctrlF4ToggleItem.target = self
+        menu.addItem(ctrlF4ToggleItem)
 
         menu.addItem(.separator())
         menu.addItem(
@@ -157,6 +163,11 @@ final class StatusItemController {
         updateCheckmarks()
     }
 
+    @objc private func toggleCtrlF4ClosesTab() {
+        Preferences.shared.ctrlF4ClosesTabEnabled.toggle()
+        updateCheckmarks()
+    }
+
     @objc private func showSettings() {
         SettingsWindowController.shared.show()
     }
@@ -172,5 +183,6 @@ final class StatusItemController {
         ctrlCVRemapToggleItem.state = Preferences.shared.ctrlCVRemapEnabled ? .on : .off
         homeEndRemapToggleItem.state = Preferences.shared.homeEndRemapEnabled ? .on : .off
         closeWindowToggleItem.state = Preferences.shared.closeWindowShortcutEnabled ? .on : .off
+        ctrlF4ToggleItem.state = Preferences.shared.ctrlF4ClosesTabEnabled ? .on : .off
     }
 }

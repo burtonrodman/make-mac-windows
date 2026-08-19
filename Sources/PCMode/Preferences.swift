@@ -51,6 +51,7 @@ final class Preferences {
     private let closeWindowShortcutKey = "closeWindowShortcutEnabled"
     private let perAppKeyRemapKey = "perAppKeyRemapEnabled"
     private let perAppKeyRemapsKey = "perAppKeyRemapsV1"
+    private let ctrlF4ClosesTabKey = "ctrlF4ClosesTabEnabled"
 
     /// Bundle identifiers exempted from the Control+A/C/S/V remap below —
     /// terminal emulators (where Control+A is readline's "beginning of
@@ -212,6 +213,15 @@ final class Preferences {
             guard let data = try? JSONEncoder().encode(newValue) else { return }
             defaults.set(data, forKey: perAppKeyRemapsKey)
         }
+    }
+
+    /// Control+F4 remapped to Command+W, mirroring Windows' Ctrl+F4 (closes
+    /// the current tab/document within an app, as distinct from Alt+F4/this
+    /// app's Command+F4, which close the whole window). Defaults on, like
+    /// the other shortcuts. See `HotkeyEventTap.remapControlF4`.
+    var ctrlF4ClosesTabEnabled: Bool {
+        get { defaults.object(forKey: ctrlF4ClosesTabKey) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: ctrlF4ClosesTabKey) }
     }
 }
 

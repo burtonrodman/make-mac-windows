@@ -212,6 +212,12 @@ final class HotkeyEventTap {
                 return Unmanaged.passUnretained(event)
             }
 
+            if remapControlF4(keyCode: keyCode, flags: flags, event: event) {
+                // Mutated in place to Cmd+W above — pass the same event
+                // through rather than swallowing it.
+                return Unmanaged.passUnretained(event)
+            }
+
             if remapHomeEnd(keyCode: keyCode, flags: flags, event: event) {
                 // Mutated in place to the Cmd+Arrow equivalent above — pass
                 // the same event through rather than swallowing it.
@@ -354,6 +360,37 @@ final class HotkeyEventTap {
             return false
         }
 
+        event.flags = remaining.union(.maskCommand)
+        return true
+    }
+
+    /// Control+F4 remapped to Command+W in place — mirroring Windows'
+    /// Ctrl+F4, which closes the current tab/document within an app (as
+    /// distinct from Alt+F4 — and this app's Command+F4, see
+    /// `handleCloseWindowKey` — which close the whole window instead).
+    /// Requires *bare* Control (no Shift/Option/Command riding along), same
+    /// rationale as `remapControlShortcuts`. "Control" here means whichever
+    /// physical key(s) are currently assigned the `.control` role (see
+    /// `ModifierKeys.swift`), not necessarily literal Control. Returns
+    /// whether the event was remapped.
+    private func remapControlF4(keyCode: Int, flags: CGEventFlags, event: CGEvent) -> Bool {
+        guard Preferences.shared.ctrlF4ClosesTabEnabled, keyCode == kVK_F4 else { return false }
+
+        let controlSlots = Preferences.shared.slotsHeld(inBucket: .control, flags: flags)
+        guard !controlSlots.isEmpty else { return false }
+
+        var remaining = flags
+        for slot in controlSlots { remaining.subtract(slot.flagBits) }
+        guard
+            !remaining.contains(.maskControl),
+            !remaining.contains(.maskCommand),
+            !remaining.contains(.maskShift),
+            !remaining.contains(.maskAlternate)
+        else {
+            return false
+        }
+
+        event.setIntegerValueField(.keyboardEventKeycode, value: Int64(kVK_ANSI_W))
         event.flags = remaining.union(.maskCommand)
         return true
     }

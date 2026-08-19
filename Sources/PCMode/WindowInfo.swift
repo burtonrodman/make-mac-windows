@@ -27,7 +27,10 @@ struct WindowInfo {
     /// or if the window has since closed — callers should fall back to
     /// showing just the app icon in that case.
     var previewImage: NSImage? {
-        guard let cgImage = CGWindowListCreateImage(
+        // `windowID == 0` marks a windowless-app entry (see
+        // `WindowLister.listWindows`) — there's no real window to grab a
+        // thumbnail of, so skip straight to the app-icon fallback.
+        guard windowID != 0, let cgImage = CGWindowListCreateImage(
             .null,
             .optionIncludingWindow,
             windowID,
@@ -72,7 +75,7 @@ enum WindowLister {
 
         let ownPID = ProcessInfo.processInfo.processIdentifier
 
-        return rawList.compactMap { entry -> WindowInfo? in
+        let windows = rawList.compactMap { entry -> WindowInfo? in
             guard
                 let layer = entry[kCGWindowLayer as String] as? Int, layer == 0,
                 let ownerPID = entry[kCGWindowOwnerPID as String] as? Int,
@@ -120,5 +123,29 @@ enum WindowLister {
                 bounds: bounds
             )
         }
+
+        // Running, Dock-visible apps that own none of the on-screen windows
+        // above (no window open at all, or everything minimized/off-screen)
+        // still get an entry — icon only, `windowID: 0` so `previewImage`
+        // skips straight to that fallback — so the switcher can bring them
+        // forward instead of silently omitting them.
+        let pidsWithWindows = Set(windows.map(\.pid))
+        let windowlessApps = NSWorkspace.shared.runningApplications
+            .filter { app in
+                app.activationPolicy == .regular
+                    && app.processIdentifier != ownPID
+                    && !pidsWithWindows.contains(app.processIdentifier)
+            }
+            .map { app in
+                WindowInfo(
+                    windowID: 0,
+                    pid: app.processIdentifier,
+                    ownerName: app.localizedName ?? "",
+                    title: "",
+                    bounds: .zero
+                )
+            }
+
+        return windows + windowlessApps
     }
 }
