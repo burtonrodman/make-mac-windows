@@ -33,6 +33,7 @@ final class SwitcherPanel: NSPanel {
         let outerStackSpacing: CGFloat
         let cellCaptionFontSize: CGFloat
         let bigCaptionFontSize: CGFloat
+        let machineLabelFontSize: CGFloat
 
         init(scale: CGFloat) {
             previewWidth = 420 * scale
@@ -52,13 +53,23 @@ final class SwitcherPanel: NSPanel {
             outerStackSpacing = max(10, 16 * scale)
             cellCaptionFontSize = max(10, 12 * scale)
             bigCaptionFontSize = max(11, 14 * scale)
+            // Deliberately bigger than the big caption below the grid — this
+            // is the one piece of chrome answering "which physical Mac is
+            // this," so it should read at a glance, not as a footnote.
+            machineLabelFontSize = max(18, 24 * scale)
         }
 
         /// Estimated non-grid chrome height (outer insets, the spacing down
-        /// to the caption, and the caption's own line height) — used to cap
-        /// the grid's visible height to what actually fits the screen.
-        var chromeHeight: CGFloat {
-            outerTopInset + outerBottomInset + outerStackSpacing + bigCaptionFontSize + 6
+        /// to the caption, the caption's own line height, and — while a
+        /// Screen Sharing session is active, see `machineLabel` — the
+        /// machine-name label above the grid plus its own spacing) — used to
+        /// cap the grid's visible height to what actually fits the screen.
+        func chromeHeight(showingMachineLabel: Bool) -> CGFloat {
+            var height = outerTopInset + outerBottomInset + outerStackSpacing + bigCaptionFontSize + 6
+            if showingMachineLabel {
+                height += machineLabelFontSize + 8 + outerStackSpacing
+            }
+            return height
         }
     }
 
@@ -74,6 +85,19 @@ final class SwitcherPanel: NSPanel {
     /// scaling down.
     private let scrollView = NSScrollView()
     private let captionLabel = NSTextField(labelWithString: "")
+    /// Names *this* Mac — where this instance of PCMode is actually running
+    /// — whenever a Screen Sharing session is active in either direction
+    /// (see `ScreenSharingInfo`), so it's obvious which physical Mac you're
+    /// typing into once a Screen Sharing window is in the mix. Hidden (and,
+    /// per `NSStackView`'s default behavior, taking up no space or spacing)
+    /// the rest of the time.
+    private let machineLabel = NSTextField(labelWithString: "")
+    /// A translucent wash of the user's System Settings > Appearance >
+    /// Accent Color, sitting between the vibrancy blur and everything else —
+    /// mirrors how Windows tints its own Alt-Tab UI with the system accent
+    /// color, rather than the plain neutral vibrancy macOS's own Cmd+Tab
+    /// bar uses. See `updateAccentTint`.
+    private let tintView = NSView()
     private let outerStack = NSStackView()
     private var cellViews: [NSView] = []
     private var windows: [WindowInfo] = []
@@ -122,6 +146,12 @@ final class SwitcherPanel: NSPanel {
         visualEffect.layer?.cornerCurve = .continuous
         visualEffect.layer?.masksToBounds = true
 
+        tintView.wantsLayer = true
+        tintView.layer?.cornerRadius = Self.panelCornerRadius
+        tintView.layer?.cornerCurve = .continuous
+        tintView.layer?.masksToBounds = true
+        tintView.translatesAutoresizingMaskIntoConstraints = false
+
         grid.orientation = .vertical
         grid.alignment = .centerX
         grid.spacing = layout.itemSpacing
@@ -145,6 +175,15 @@ final class SwitcherPanel: NSPanel {
         captionLabel.translatesAutoresizingMaskIntoConstraints = false
         captionLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
+        machineLabel.font = .systemFont(ofSize: layout.machineLabelFontSize, weight: .bold)
+        machineLabel.alignment = .center
+        machineLabel.lineBreakMode = .byTruncatingTail
+        machineLabel.textColor = .labelColor
+        machineLabel.translatesAutoresizingMaskIntoConstraints = false
+        machineLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        machineLabel.isHidden = true
+
+        outerStack.addArrangedSubview(machineLabel)
         outerStack.addArrangedSubview(scrollView)
         outerStack.addArrangedSubview(captionLabel)
         outerStack.orientation = .vertical
@@ -156,33 +195,73 @@ final class SwitcherPanel: NSPanel {
         )
         outerStack.translatesAutoresizingMaskIntoConstraints = false
 
+        // `tintView` sits between the blur and everything else — added
+        // first so it paints under `outerStack`, not over it.
+        visualEffect.addSubview(tintView)
         visualEffect.addSubview(outerStack)
         let scrollViewWidthConstraint = scrollView.widthAnchor.constraint(equalToConstant: 0)
         let scrollViewHeightConstraint = scrollView.heightAnchor.constraint(equalToConstant: 0)
         self.scrollViewWidthConstraint = scrollViewWidthConstraint
         self.scrollViewHeightConstraint = scrollViewHeightConstraint
         NSLayoutConstraint.activate([
+            tintView.topAnchor.constraint(equalTo: visualEffect.topAnchor),
+            tintView.bottomAnchor.constraint(equalTo: visualEffect.bottomAnchor),
+            tintView.leadingAnchor.constraint(equalTo: visualEffect.leadingAnchor),
+            tintView.trailingAnchor.constraint(equalTo: visualEffect.trailingAnchor),
             outerStack.topAnchor.constraint(equalTo: visualEffect.topAnchor),
             outerStack.bottomAnchor.constraint(equalTo: visualEffect.bottomAnchor),
             outerStack.leadingAnchor.constraint(equalTo: visualEffect.leadingAnchor),
             outerStack.trailingAnchor.constraint(equalTo: visualEffect.trailingAnchor),
-            // Cap the caption at 80% of the switcher's own width (not just
-            // the icon grid's) so a long title truncates instead of forcing
-            // the panel wider or running edge-to-edge.
+            // Cap the caption (and machine label) at 80% of the switcher's
+            // own width (not just the icon grid's) so a long title/machine
+            // name truncates instead of forcing the panel wider or running
+            // edge-to-edge.
             captionLabel.widthAnchor.constraint(lessThanOrEqualTo: visualEffect.widthAnchor, multiplier: 0.8),
+            machineLabel.widthAnchor.constraint(lessThanOrEqualTo: visualEffect.widthAnchor, multiplier: 0.8),
             scrollViewWidthConstraint,
             scrollViewHeightConstraint,
         ])
 
         contentView = visualEffect
+        updateAccentTint()
     }
 
-    func show(windows: [WindowInfo], selectedIndex: Int) {
+    func show(windows: [WindowInfo], selectedIndex: Int, machineName: String?) {
         let screen = NSScreen.main
+        // Refreshed on every open rather than just once at init, in case the
+        // user's picked a different accent color (or flipped Light/Dark
+        // Mode, which some accent colors resolve slightly differently
+        // under) since the switcher last showed.
+        updateAccentTint()
+        updateMachineLabel(machineName)
         rebuild(windows: windows, screen: screen)
         updateSelection(selectedIndex)
         centerOnActiveScreen(screen)
         orderFrontRegardless()
+    }
+
+    /// Tints `tintView` with the current System Settings > Appearance >
+    /// Accent Color. A CALayer's `backgroundColor` is a plain `CGColor`
+    /// snapshot rather than a live-updating dynamic color (same tradeoff
+    /// `updateSelection` already accepts for the cell-highlight color below)
+    /// — fine here since this only needs to be current at the moment the
+    /// panel opens, not while it's already showing.
+    private func updateAccentTint() {
+        tintView.layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.22).cgColor
+    }
+
+    /// Shows/hides the machine-name label above the grid — see
+    /// `ScreenSharingInfo.activeSessionMachineName`, which supplies `name`.
+    /// Set before `rebuild(windows:screen:)` runs, since that's what sizes
+    /// the panel to fit whichever chrome is currently showing.
+    private func updateMachineLabel(_ name: String?) {
+        if let name, !name.isEmpty {
+            machineLabel.stringValue = name
+            machineLabel.isHidden = false
+        } else {
+            machineLabel.stringValue = ""
+            machineLabel.isHidden = true
+        }
     }
 
     func hide() {
@@ -264,6 +343,7 @@ final class SwitcherPanel: NSPanel {
             bottom: layout.outerBottomInset, right: layout.outerHorizontalInset
         )
         captionLabel.font = .systemFont(ofSize: layout.bigCaptionFontSize, weight: .medium)
+        machineLabel.font = .systemFont(ofSize: layout.machineLabelFontSize, weight: .bold)
 
         grid.arrangedSubviews.forEach {
             grid.removeArrangedSubview($0)
@@ -296,8 +376,10 @@ final class SwitcherPanel: NSPanel {
         // Cap how tall the grid's *visible* area gets to whatever fits the
         // active screen, so a lot of wrapped rows scrolls instead of running
         // the panel off the top/bottom.
+        let showingMachineLabel = !machineLabel.isHidden
+        let chromeHeight = layout.chromeHeight(showingMachineLabel: showingMachineLabel)
         let screenHeight = screen?.visibleFrame.height ?? 800
-        let maxGridHeight = max(layout.previewHeight, screenHeight * 0.9 - layout.chromeHeight)
+        let maxGridHeight = max(layout.previewHeight, screenHeight * 0.9 - chromeHeight)
         let visibleGridHeight = min(gridSize.height, maxGridHeight)
 
         scrollViewWidthConstraint?.constant = gridSize.width
@@ -306,7 +388,7 @@ final class SwitcherPanel: NSPanel {
         var newFrame = frame
         newFrame.size = NSSize(
             width: max(280, gridSize.width + layout.outerHorizontalInset * 2),
-            height: max(180, visibleGridHeight + layout.chromeHeight)
+            height: max(180, visibleGridHeight + chromeHeight)
         )
         setFrame(newFrame, display: false)
     }

@@ -1,3 +1,4 @@
+import ApplicationServices
 import Carbon.HIToolbox
 import Cocoa
 
@@ -230,7 +231,7 @@ final class HotkeyEventTap {
                 return Unmanaged.passUnretained(event)
             }
 
-            if let triggerBucket = Preferences.shared.switcherTrigger.bucket {
+            if let triggerBucket = Preferences.shared.switcherTrigger.bucket, !isScreenSharingFullScreen() {
                 let triggerHeld = Preferences.shared.isBucketHeld(triggerBucket, in: flags)
                 if keyCode == kVK_Tab, triggerHeld {
                     onTabDown?(flags.contains(.maskShift))
@@ -264,6 +265,51 @@ final class HotkeyEventTap {
         }
 
         return Unmanaged.passUnretained(event)
+    }
+
+    /// True when Screen Sharing is both frontmost and its window is
+    /// currently full-screen — meaning this Mac is being used to view
+    /// another Mac's desktop, which now fills the display. Consulted by the
+    /// switcher-trigger handling above so trigger+Tab (and the arrow-key
+    /// equivalents) passes through unswallowed instead of popping this
+    /// Mac's own switcher panel open on top of someone else's screen — the
+    /// remote Mac (if it's running PCMode too) should get the keystroke
+    /// instead. Only gates the switcher itself; every other remap
+    /// (snap/close-window/Ctrl+C+V/etc.) is unaffected, since Screen Sharing
+    /// is already in `Preferences.defaultCtrlCVDenylist` for those.
+    private func isScreenSharingFullScreen() -> Bool {
+        guard
+            let app = NSWorkspace.shared.frontmostApplication,
+            app.bundleIdentifier == "com.apple.ScreenSharing"
+        else {
+            return false
+        }
+
+        let appElement = AXUIElementCreateApplication(app.processIdentifier)
+        var windowRef: CFTypeRef?
+        guard
+            AXUIElementCopyAttributeValue(
+                appElement, kAXFocusedWindowAttribute as CFString, &windowRef
+            ) == .success
+        else {
+            return false
+        }
+        let window = windowRef as! AXUIElement
+
+        // "AXFullScreen" has no public `kAX...Attribute` constant in the SDK
+        // (only `kAXFullScreenButtonAttribute`, the zoom button itself) but
+        // is a long-stable, widely-relied-on attribute — the same one
+        // window-management tools like Rectangle/Amethyst/yabai query — so
+        // it's addressed by its raw string here.
+        var fullScreenRef: CFTypeRef?
+        guard
+            AXUIElementCopyAttributeValue(
+                window, "AXFullScreen" as CFString, &fullScreenRef
+            ) == .success
+        else {
+            return false
+        }
+        return (fullScreenRef as? Bool) ?? false
     }
 
     /// Start-role-key+Left/Right/Up/Down snap the frontmost window (left

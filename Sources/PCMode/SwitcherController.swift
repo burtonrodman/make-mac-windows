@@ -39,7 +39,7 @@ final class SwitcherController {
             // Index 0 is the current window; the first Tab should land on
             // the next-most-recent one, exactly like Cmd+Tab/Alt+Tab do.
             selectedIndex = reverse ? windows.count - 1 : 1
-            panel.show(windows: windows, selectedIndex: selectedIndex)
+            panel.show(windows: windows, selectedIndex: selectedIndex, machineName: ScreenSharingInfo.activeSessionMachineName)
         } else {
             guard !windows.isEmpty else { return }
             selectedIndex = (selectedIndex + (reverse ? -1 : 1) + windows.count) % windows.count
