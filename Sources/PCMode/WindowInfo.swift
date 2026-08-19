@@ -40,6 +40,20 @@ struct WindowInfo {
 }
 
 enum WindowLister {
+    /// Bundle IDs of apps known to keep permanent, invisible "overlay"
+    /// windows around — one full-monitor-sized window per connected display,
+    /// used for the app's own OSD/hotkey handling rather than anything a
+    /// user would switch to. They're opaque, ordinary-layer, and bigger than
+    /// the tiny-helper-window cutoff below, so nothing else about them looks
+    /// unusual — see `listWindows` for the title-based check that actually
+    /// tells them apart from a real window.
+    ///
+    /// - `Qisda.DDPM`: Dell/BenQ's Display & Peripheral Manager, confirmed via
+    ///   `defaults read .../DDPM.app/Contents/Info.plist CFBundleIdentifier`.
+    ///   Shows up as two untitled, full-screen, on-screen windows (one per
+    ///   monitor) at all times.
+    private static let phantomOverlayBundleIDs: Set<String> = ["Qisda.DDPM"]
+
     /// Lists normal, on-screen windows across all apps, ordered front-to-back
     /// (as returned by the window server). That ordering doubles as a decent
     /// most-recently-used approximation, since activating a window brings it
@@ -89,6 +103,14 @@ enum WindowLister {
 
             let ownerName = entry[kCGWindowOwnerName as String] as? String ?? ""
             let title = entry[kCGWindowName as String] as? String ?? ""
+
+            // See `phantomOverlayBundleIDs` — scoped to *untitled* windows
+            // from those specific apps so a real, user-facing window (which
+            // always carries a title) still shows up if one's ever open.
+            if title.isEmpty, let bundleID = NSRunningApplication(processIdentifier: pid_t(ownerPID))?.bundleIdentifier,
+                Self.phantomOverlayBundleIDs.contains(bundleID) {
+                return nil
+            }
 
             return WindowInfo(
                 windowID: CGWindowID(windowNumber),

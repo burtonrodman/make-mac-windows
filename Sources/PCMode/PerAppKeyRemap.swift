@@ -198,5 +198,25 @@ enum PerAppKeyRemaps {
             toKeyCode: kVK_ANSI_I,
             toModifiers: [.command, .option]
         ),
+
+        // F5 (refresh on Windows) → Cmd+F5. Bare F5 — no modifier
+        // requirements.
+        PerAppKeyRemap(
+            bundleID: "com.google.Chrome",
+            fromKeyCode: kVK_F5,
+            fromModifiers: [],
+            toKeyCode: kVK_F5,
+            toModifiers: [.command]
+        ),
+
+        // Ctrl+F5 (hard refresh on Windows) → Cmd+Shift+R (Chrome's own Mac
+        // shortcut for Reload ignoring cache).
+        PerAppKeyRemap(
+            bundleID: "com.google.Chrome",
+            fromKeyCode: kVK_F5,
+            fromModifiers: [ModifierRequirement(base: .control, side: .both)],
+            toKeyCode: kVK_ANSI_R,
+            toModifiers: [.command, .shift]
+        ),
     ]
 }
