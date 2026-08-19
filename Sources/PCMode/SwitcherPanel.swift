@@ -3,10 +3,9 @@ import Cocoa
 /// The on-screen HUD shown while the trigger modifier is held after
 /// trigger+Tab — a translucent strip of live window preview thumbnails, each
 /// badged with its app icon and labeled with its own icon + window title,
-/// plus a larger caption below the whole grid calling out the currently
-/// selected window, mirroring the visual language of macOS's own Cmd+Tab bar
-/// but at per-window granularity, and closer to Windows' Alt+Tab in showing
-/// the window's actual contents rather than just its app icon.
+/// mirroring the visual language of macOS's own Cmd+Tab bar but at
+/// per-window granularity, and closer to Windows' Alt+Tab in showing the
+/// window's actual contents rather than just its app icon.
 final class SwitcherPanel: NSPanel {
     private static let panelCornerRadius: CGFloat = 28
 
@@ -32,7 +31,6 @@ final class SwitcherPanel: NSPanel {
         let outerBottomInset: CGFloat
         let outerStackSpacing: CGFloat
         let cellCaptionFontSize: CGFloat
-        let bigCaptionFontSize: CGFloat
         let machineLabelFontSize: CGFloat
 
         init(scale: CGFloat) {
@@ -51,21 +49,19 @@ final class SwitcherPanel: NSPanel {
             outerTopInset = max(16, 28 * scale)
             outerBottomInset = max(14, 24 * scale)
             outerStackSpacing = max(10, 16 * scale)
-            cellCaptionFontSize = max(10, 12 * scale)
-            bigCaptionFontSize = max(11, 14 * scale)
-            // Deliberately bigger than the big caption below the grid — this
-            // is the one piece of chrome answering "which physical Mac is
-            // this," so it should read at a glance, not as a footnote.
+            cellCaptionFontSize = max(11, 14 * scale)
+            // Deliberately bigger than the per-cell captions — this is the
+            // one piece of chrome answering "which physical Mac is this,"
+            // so it should read at a glance, not as a footnote.
             machineLabelFontSize = max(18, 24 * scale)
         }
 
-        /// Estimated non-grid chrome height (outer insets, the spacing down
-        /// to the caption, the caption's own line height, and — while a
+        /// Estimated non-grid chrome height (outer insets and — while a
         /// Screen Sharing session is active, see `machineLabel` — the
         /// machine-name label above the grid plus its own spacing) — used to
         /// cap the grid's visible height to what actually fits the screen.
         func chromeHeight(showingMachineLabel: Bool) -> CGFloat {
-            var height = outerTopInset + outerBottomInset + outerStackSpacing + bigCaptionFontSize + 6
+            var height = outerTopInset + outerBottomInset
             if showingMachineLabel {
                 height += machineLabelFontSize + 8 + outerStackSpacing
             }
@@ -84,7 +80,6 @@ final class SwitcherPanel: NSPanel {
     /// detached) can still produce more rows than fit vertically even after
     /// scaling down.
     private let scrollView = NSScrollView()
-    private let captionLabel = NSTextField(labelWithString: "")
     /// Names *this* Mac — where this instance of PCMode is actually running
     /// — whenever a Screen Sharing session is active in either direction
     /// (see `ScreenSharingInfo`), so it's obvious which physical Mac you're
@@ -168,13 +163,6 @@ final class SwitcherPanel: NSPanel {
         scrollView.horizontalScrollElasticity = .none
         scrollView.translatesAutoresizingMaskIntoConstraints = false
 
-        captionLabel.font = .systemFont(ofSize: layout.bigCaptionFontSize, weight: .medium)
-        captionLabel.alignment = .center
-        captionLabel.lineBreakMode = .byTruncatingTail
-        captionLabel.textColor = .labelColor
-        captionLabel.translatesAutoresizingMaskIntoConstraints = false
-        captionLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-
         machineLabel.font = .systemFont(ofSize: layout.machineLabelFontSize, weight: .bold)
         machineLabel.alignment = .center
         machineLabel.lineBreakMode = .byTruncatingTail
@@ -185,7 +173,6 @@ final class SwitcherPanel: NSPanel {
 
         outerStack.addArrangedSubview(machineLabel)
         outerStack.addArrangedSubview(scrollView)
-        outerStack.addArrangedSubview(captionLabel)
         outerStack.orientation = .vertical
         outerStack.alignment = .centerX
         outerStack.spacing = layout.outerStackSpacing
@@ -212,11 +199,9 @@ final class SwitcherPanel: NSPanel {
             outerStack.bottomAnchor.constraint(equalTo: visualEffect.bottomAnchor),
             outerStack.leadingAnchor.constraint(equalTo: visualEffect.leadingAnchor),
             outerStack.trailingAnchor.constraint(equalTo: visualEffect.trailingAnchor),
-            // Cap the caption (and machine label) at 80% of the switcher's
-            // own width (not just the icon grid's) so a long title/machine
-            // name truncates instead of forcing the panel wider or running
-            // edge-to-edge.
-            captionLabel.widthAnchor.constraint(lessThanOrEqualTo: visualEffect.widthAnchor, multiplier: 0.8),
+            // Cap the machine label at 80% of the switcher's own width (not
+            // just the icon grid's) so a long machine name truncates instead
+            // of forcing the panel wider or running edge-to-edge.
             machineLabel.widthAnchor.constraint(lessThanOrEqualTo: visualEffect.widthAnchor, multiplier: 0.8),
             scrollViewWidthConstraint,
             scrollViewHeightConstraint,
@@ -275,7 +260,6 @@ final class SwitcherPanel: NSPanel {
                 : NSColor.clear.cgColor
         }
         if windows.indices.contains(index) {
-            captionLabel.stringValue = caption(for: windows[index])
             // Keep the selection in view as Tab/arrow keys move it past the
             // edge of whatever's currently scrolled into the visible area.
             cellViews[index].scrollToVisible(cellViews[index].bounds)
@@ -299,21 +283,6 @@ final class SwitcherPanel: NSPanel {
         let column = index - rowRanges[currentRow].lowerBound
         let targetRow = rowRanges[newRow]
         return min(targetRow.lowerBound + column, targetRow.upperBound - 1)
-    }
-
-    /// "AppName — Window Title", falling back to just the app name when the
-    /// window has no title of its own (common for single-window utilities,
-    /// or when Screen Recording permission hasn't been granted — see
-    /// `AppDelegate.requestScreenRecordingPermissionIfNeeded`). Titles that
-    /// already start with the app name (Terminal-style: "Terminal —
-    /// make-mac-windows — ...") are shown as-is rather than doubling it up.
-    private func caption(for window: WindowInfo) -> String {
-        let title = window.title
-        guard !title.isEmpty else { return window.ownerName }
-        guard title != window.ownerName, !title.hasPrefix(window.ownerName) else {
-            return title
-        }
-        return "\(window.ownerName) — \(title)"
     }
 
     /// How much to shrink the base (QHD-tuned) sizing for the given screen.
@@ -342,7 +311,6 @@ final class SwitcherPanel: NSPanel {
             top: layout.outerTopInset, left: layout.outerHorizontalInset,
             bottom: layout.outerBottomInset, right: layout.outerHorizontalInset
         )
-        captionLabel.font = .systemFont(ofSize: layout.bigCaptionFontSize, weight: .medium)
         machineLabel.font = .systemFont(ofSize: layout.machineLabelFontSize, weight: .bold)
 
         grid.arrangedSubviews.forEach {

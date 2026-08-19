@@ -15,11 +15,16 @@ enum ScreenSharingInfo {
     /// This machine's own name (as set in System Settings > General >
     /// About), if a Screen Sharing session is active in either direction —
     /// `nil` the rest of the time, so the switcher's machine-name label
-    /// stays hidden by default.
+    /// stays hidden by default. Suffixed with "(Sharing)" specifically on
+    /// the host side (someone else is viewing/controlling *this* Mac right
+    /// now), e.g. "Mac Studio (Sharing)" — that's the direction worth
+    /// calling out, since it's the one where this Mac's screen is what's
+    /// actually being watched.
     static var activeSessionMachineName: String? {
         guard isClient || isHost else { return nil }
         guard let cfName = SCDynamicStoreCopyComputerName(nil, nil) else { return nil }
-        return cfName as String
+        let name = cfName as String
+        return isHost ? "\(name) (Sharing)" : name
     }
 
     /// True while Screen Sharing.app is running here to view another Mac —
@@ -29,15 +34,18 @@ enum ScreenSharingInfo {
     }
 
     /// True while someone else is viewing/controlling this Mac over Screen
-    /// Sharing — detected via `RFBEventHelperd`, the event-injection helper
-    /// macOS spawns (as the `_ard` user) only for the duration of an active
-    /// incoming session, not merely while Screen Sharing/Remote Management
-    /// is turned on in System Settings. This is undocumented behavior, not a
-    /// public API, so a future macOS version could rename or remove it — the
+    /// Sharing — detected via `screensharingd`, which launchd registers as
+    /// socket-activated on the VNC/`rfb` port (`Disabled` in its static
+    /// plist, spawned only when a connection actually arrives on
+    /// `Sockets > Listener`). So its presence means an incoming session is
+    /// live right now, not merely that Screen Sharing/Remote Management is
+    /// turned on in System Settings. The exact daemon name is still internal
+    /// (previously `RFBEventHelperd`, which macOS has since retired), so a
+    /// future macOS version could rename or replace it again — the
     /// switcher's machine-name label would then just stop appearing for the
     /// host side rather than anything breaking.
     private static var isHost: Bool {
-        isProcessRunning(named: "RFBEventHelperd")
+        isProcessRunning(named: "screensharingd")
     }
 
     /// Whether a process with this exact name (`kinfo_proc.kp_proc.p_comm`)

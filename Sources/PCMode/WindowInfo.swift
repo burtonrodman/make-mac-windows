@@ -129,12 +129,35 @@ enum WindowLister {
         // still get an entry — icon only, `windowID: 0` so `previewImage`
         // skips straight to that fallback — so the switcher can bring them
         // forward instead of silently omitting them.
+        //
+        // Apps from `phantomOverlayBundleIDs` are excluded here too, by
+        // bundle ID rather than by pid-in-this-snapshot: their overlay
+        // windows aren't always present in a given CGWindowList snapshot
+        // (DDPM, for one, is frequently caught with zero on-screen windows
+        // at all), so relying on this pass having actually seen and filtered
+        // one isn't reliable. These apps have no real window to bring
+        // forward and, being background utilities, activating them just
+        // leaves an empty menu bar behind — so they shouldn't get a switcher
+        // entry at all.
+        //
+        // Also excluded: any bundle ID that already owns a real window
+        // above under a *different* pid. Some apps (VS Code chief among
+        // them, via `--new-window`/`--extensionDevelopmentPath`) run as
+        // multiple separate OS processes sharing one bundle ID; if one of
+        // those processes' windows has since closed while the process
+        // itself lingers, it would otherwise show up as a bare icon
+        // duplicate of the app whose real window is already listed.
         let pidsWithWindows = Set(windows.map(\.pid))
+        let bundleIDsWithWindows = Set(pidsWithWindows.compactMap { pid in
+            NSRunningApplication(processIdentifier: pid)?.bundleIdentifier
+        })
         let windowlessApps = NSWorkspace.shared.runningApplications
             .filter { app in
                 app.activationPolicy == .regular
                     && app.processIdentifier != ownPID
                     && !pidsWithWindows.contains(app.processIdentifier)
+                    && !(app.bundleIdentifier.map(Self.phantomOverlayBundleIDs.contains) ?? false)
+                    && !(app.bundleIdentifier.map(bundleIDsWithWindows.contains) ?? false)
             }
             .map { app in
                 WindowInfo(
