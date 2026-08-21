@@ -9,6 +9,17 @@ import Cocoa
 final class SwitcherPanel: NSPanel {
     private static let panelCornerRadius: CGFloat = 28
 
+    /// A single cell's clickable surface — reports its flat index back to
+    /// the panel on mouse-down so clicking a window (rather than only
+    /// Tab/arrow-key cycling to it) can select and activate it too.
+    private final class CellView: NSView {
+        var onClick: (() -> Void)?
+
+        override func mouseDown(with event: NSEvent) {
+            onClick?()
+        }
+    }
+
     /// All the sizing that scales with the active screen — a scale of 1.0
     /// reproduces the original fixed sizing (tuned by eye on a QHD or larger
     /// display), and everything shrinks together below that. Without this,
@@ -105,6 +116,12 @@ final class SwitcherPanel: NSPanel {
     /// above/below.
     private var rowRanges: [Range<Int>] = []
 
+    /// Fired when a cell is clicked, with that window's flat index —
+    /// `SwitcherController` wires this up to select and immediately commit,
+    /// so clicking a window activates it just like releasing the trigger key
+    /// after Tabbing/arrowing to it.
+    var onWindowClicked: ((Int) -> Void)?
+
     convenience init() {
         self.init(
             contentRect: NSRect(x: 0, y: 0, width: 240, height: 140),
@@ -120,7 +137,10 @@ final class SwitcherPanel: NSPanel {
         backgroundColor = .clear
         hasShadow = true
         hidesOnDeactivate = false
-        ignoresMouseEvents = true
+        // Clickable (see `CellView`/`onWindowClicked`) — unlike macOS's own
+        // Cmd+Tab bar, but matching Windows' Alt-Tab, where clicking a
+        // window in the switcher activates it.
+        ignoresMouseEvents = false
         // Let the panel's vibrancy track System Settings > Appearance
         // (Light/Dark/Auto) rather than pinning one look.
         appearance = nil
@@ -325,9 +345,11 @@ final class SwitcherPanel: NSPanel {
             rowStack.orientation = .horizontal
             rowStack.spacing = layout.itemSpacing
 
-            let rowCells = row.map(makeCell)
-            rowCells.forEach { rowStack.addArrangedSubview($0) }
             let rowStart = cellViews.count
+            let rowCells = row.enumerated().map { offset, window in
+                makeCell(for: window, index: rowStart + offset)
+            }
+            rowCells.forEach { rowStack.addArrangedSubview($0) }
             cellViews.append(contentsOf: rowCells)
             rowRanges.append(rowStart..<cellViews.count)
 
@@ -382,17 +404,19 @@ final class SwitcherPanel: NSPanel {
         }
     }
 
-    private func makeCell(for window: WindowInfo) -> NSView {
+    private func makeCell(for window: WindowInfo, index: Int) -> NSView {
         // `container` is what the selection highlight paints onto (see
         // `updateSelection`) — its own corner radius is a touch larger than
         // `content`'s so the highlight reads as a consistent margin around
         // the thumbnail rather than two mismatched rounded rects. It
         // deliberately does *not* mask its bounds, so the app-icon badge can
-        // overhang the thumbnail's corner without getting clipped.
-        let container = NSView()
+        // overhang the thumbnail's corner without getting clipped. Also the
+        // cell's clickable surface — see `CellView`.
+        let container = CellView()
         container.wantsLayer = true
         container.layer?.cornerRadius = layout.cellCornerRadius + layout.cellPadding
         container.layer?.cornerCurve = .continuous
+        container.onClick = { [weak self] in self?.onWindowClicked?(index) }
 
         let content = NSView()
         content.wantsLayer = true

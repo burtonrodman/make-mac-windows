@@ -11,7 +11,12 @@ final class SwitcherController {
     private var windows: [WindowInfo] = []
     private var selectedIndex = 0
 
-    private init() {}
+    private init() {
+        panel.onWindowClicked = { [weak self] index in
+            self?.selectedIndex = index
+            self?.commit()
+        }
+    }
 
     func start() {
         HotkeyEventTap.shared.onTabDown = { [weak self] reverse in

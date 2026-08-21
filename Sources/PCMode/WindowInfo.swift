@@ -1,3 +1,4 @@
+import ApplicationServices
 import Cocoa
 
 /// A single on-screen window, independent of which app owns it. This is the
@@ -58,13 +59,10 @@ enum WindowLister {
     private static let phantomOverlayBundleIDs: Set<String> = ["Qisda.DDPM"]
 
     /// Lists normal, on-screen windows across all apps, ordered front-to-back
-    /// (as returned by the window server). That ordering doubles as a decent
-    /// most-recently-used approximation, since activating a window brings it
-    /// to the front.
-    ///
-    /// Known v1 limitation: minimized windows are excluded (CGWindowList only
-    /// reports on-screen windows). Windows' Alt-Tab includes minimized
-    /// windows too — that's a natural follow-up, not blocking v1.
+    /// (as returned by the window server), followed by any minimized windows
+    /// (see `minimizedWindows` — CGWindowList itself never reports those).
+    /// The on-screen ordering doubles as a decent most-recently-used
+    /// approximation, since activating a window brings it to the front.
     static func listWindows() -> [WindowInfo] {
         let options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
         guard let rawList = CGWindowListCopyWindowInfo(options, kCGNullWindowID)
@@ -124,11 +122,14 @@ enum WindowLister {
             )
         }
 
-        // Running, Dock-visible apps that own none of the on-screen windows
-        // above (no window open at all, or everything minimized/off-screen)
-        // still get an entry — icon only, `windowID: 0` so `previewImage`
-        // skips straight to that fallback — so the switcher can bring them
-        // forward instead of silently omitting them.
+        let minimized = minimizedWindows(knownWindowIDs: Set(windows.map(\.windowID)), ownPID: ownPID)
+
+        // Running, Dock-visible apps that own none of the windows above (no
+        // window open at all, or every window hidden via Cmd+H rather than
+        // minimized — minimized ones are now covered by `minimized`) still
+        // get an entry — icon only, `windowID: 0` so `previewImage` skips
+        // straight to that fallback — so the switcher can bring them forward
+        // instead of silently omitting them.
         //
         // Apps from `phantomOverlayBundleIDs` are excluded here too, by
         // bundle ID rather than by pid-in-this-snapshot: their overlay
@@ -147,7 +148,7 @@ enum WindowLister {
         // those processes' windows has since closed while the process
         // itself lingers, it would otherwise show up as a bare icon
         // duplicate of the app whose real window is already listed.
-        let pidsWithWindows = Set(windows.map(\.pid))
+        let pidsWithWindows = Set(windows.map(\.pid) + minimized.map(\.pid))
         let bundleIDsWithWindows = Set(pidsWithWindows.compactMap { pid in
             NSRunningApplication(processIdentifier: pid)?.bundleIdentifier
         })
@@ -169,6 +170,59 @@ enum WindowLister {
                 )
             }
 
-        return windows + windowlessApps
+        return windows + minimized + windowlessApps
+    }
+
+    /// Minimized windows across all apps, found via the Accessibility API
+    /// since `CGWindowListCopyWindowInfo` never reports them (even without
+    /// `.optionOnScreenOnly` — a minimized window simply isn't in the window
+    /// server's list at all). Mirrors how `WindowActivator` already looks
+    /// windows up by `AXUIElement` to un-minimize and raise them.
+    private static func minimizedWindows(knownWindowIDs: Set<CGWindowID>, ownPID: pid_t) -> [WindowInfo] {
+        NSWorkspace.shared.runningApplications
+            .filter { app in
+                app.activationPolicy == .regular
+                    && app.processIdentifier != ownPID
+                    && !(app.bundleIdentifier.map(Self.phantomOverlayBundleIDs.contains) ?? false)
+            }
+            .flatMap { app -> [WindowInfo] in
+                let pid = app.processIdentifier
+                var axWindowsRef: CFTypeRef?
+                let err = AXUIElementCopyAttributeValue(
+                    AXUIElementCreateApplication(pid), kAXWindowsAttribute as CFString, &axWindowsRef
+                )
+                guard err == .success, let axWindows = axWindowsRef as? [AXUIElement] else {
+                    return []
+                }
+
+                return axWindows.compactMap { axWindow -> WindowInfo? in
+                    var minimizedRef: CFTypeRef?
+                    guard
+                        AXUIElementCopyAttributeValue(axWindow, kAXMinimizedAttribute as CFString, &minimizedRef) == .success,
+                        (minimizedRef as? Bool) == true
+                    else {
+                        return nil
+                    }
+
+                    var windowID: CGWindowID = 0
+                    guard _AXUIElementGetWindow(axWindow, &windowID) == .success,
+                        !knownWindowIDs.contains(windowID)
+                    else {
+                        return nil
+                    }
+
+                    var titleRef: CFTypeRef?
+                    AXUIElementCopyAttributeValue(axWindow, kAXTitleAttribute as CFString, &titleRef)
+                    let title = titleRef as? String ?? ""
+
+                    return WindowInfo(
+                        windowID: windowID,
+                        pid: pid,
+                        ownerName: app.localizedName ?? "",
+                        title: title,
+                        bounds: .zero
+                    )
+                }
+            }
     }
 }
