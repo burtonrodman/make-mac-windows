@@ -141,8 +141,8 @@ final class Preferences {
         set { defaults.set(newValue, forKey: snapShortcutsKey) }
     }
 
-    /// Control+A/C/S/V remapped to Command+A/C/S/V, mirroring Windows'
-    /// select-all/copy/save/paste shortcuts. Defaults on, like the other
+    /// Control+A/C/S/V/X remapped to Command+A/C/S/V/X, mirroring Windows'
+    /// select-all/copy/save/paste/cut shortcuts. Defaults on, like the other
     /// shortcuts; gated per-app by `ctrlCVDenylistBundleIDs` so it doesn't
     /// clobber Control+C-as-SIGINT, Control+S-as-XOFF, etc. in terminals.
     /// See `HotkeyEventTap`. (Named for the two shortcuts this started as —
@@ -153,7 +153,7 @@ final class Preferences {
         set { defaults.set(newValue, forKey: ctrlCVRemapKey) }
     }
 
-    /// Apps where Control+A/C/S/V passes through unmodified rather than
+    /// Apps where Control+A/C/S/V/X passes through unmodified rather than
     /// being remapped — see `defaultCtrlCVDenylist` for why these specific
     /// apps need the literal keystroke. Falls back to that seed list until
     /// the user (or `SettingsWindowController`) explicitly saves an edited
@@ -183,7 +183,7 @@ final class Preferences {
 
     /// Per-app literal-keystroke remaps — e.g. Chrome's Ctrl+H (History)
     /// rewritten to its native Mac equivalent, Cmd+Y. Opt-in per app rather
-    /// than a denylist, since (unlike Control+A/C/S/V or Home/End) these
+    /// than a denylist, since (unlike Control+A/C/S/V/X or Home/End) these
     /// aren't a general editing convention but a specific app's own
     /// shortcut. See `PerAppKeyRemap.swift` for the rule table and
     /// `HotkeyEventTap.remapPerAppShortcut`. Defaults on, like the other

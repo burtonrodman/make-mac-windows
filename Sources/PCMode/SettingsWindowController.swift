@@ -3,12 +3,12 @@ import UniformTypeIdentifiers
 
 /// PCMode's Settings window, one tab per concern: which physical modifier
 /// key does what (see `ModifierKeys.swift`); the "Excluded Apps" list for
-/// the Control+A/C/S/V remap feature — which apps are exempted from having
-/// their literal Control+A/C/S/V remapped to Command+A/C/S/V (see
+/// the Control+A/C/S/V/X remap feature — which apps are exempted from having
+/// their literal Control+A/C/S/V/X remapped to Command+A/C/S/V/X (see
 /// `HotkeyEventTap` and `Preferences.ctrlCVDenylistBundleIDs`), with terminal
 /// emulators and remote-desktop/VM consoles seeded in by default since they
 /// need the literal keystroke (SIGINT, XOFF, raw paste-through, etc.) rather
-/// than Mac-style select-all/copy/save/paste; the "Per-App Mappings" table
+/// than Mac-style select-all/cut/copy/save/paste; the "Per-App Mappings" table
 /// (see `PerAppKeyRemap.swift`) — add/edit/remove app-specific shortcut
 /// rewrites like Chrome's Ctrl+H → Cmd+Y, each opened in
 /// `PerAppMappingEditorSheet`; and "Snap Zones" — the Option+Arrow
@@ -200,11 +200,11 @@ final class SettingsWindowController: NSWindowController {
     }
 
     private func buildExcludedAppsSection() -> NSView {
-        let heading = NSTextField(labelWithString: "Apps Excluded from Control+A/C/S/V Remap")
+        let heading = NSTextField(labelWithString: "Apps Excluded from Control+A/C/S/V/X Remap")
         heading.font = .boldSystemFont(ofSize: 13)
 
         let explanation = NSTextField(wrappingLabelWithString:
-            "PCMode remaps Control+A/C/S/V to Command+A/C/S/V everywhere except " +
+            "PCMode remaps Control+A/C/S/V/X to Command+A/C/S/V/X everywhere except " +
                 "the apps below — typically terminals and remote-desktop/VM consoles, " +
                 "where the literal keystroke needs to reach the app (e.g. Control+C as " +
                 "an interrupt signal, or Control+S as an XOFF that freezes output).")

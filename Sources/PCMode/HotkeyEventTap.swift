@@ -275,8 +275,8 @@ final class HotkeyEventTap {
     /// Mac's own switcher panel open on top of someone else's screen — the
     /// remote Mac (if it's running PCMode too) should get the keystroke
     /// instead. Only gates the switcher itself; every other remap
-    /// (snap/close-window/Ctrl+C+V/etc.) is unaffected, since Screen Sharing
-    /// is already in `Preferences.defaultCtrlCVDenylist` for those.
+    /// (snap/close-window/Ctrl+C+V+X/etc.) is unaffected, since Screen
+    /// Sharing is already in `Preferences.defaultCtrlCVDenylist` for those.
     private func isScreenSharingFullScreen() -> Bool {
         guard
             let app = NSWorkspace.shared.frontmostApplication,
@@ -360,8 +360,8 @@ final class HotkeyEventTap {
         return true
     }
 
-    /// Control+A/C/S/V, remapped to Command+A/C/S/V in place — mirroring
-    /// Windows' select-all/copy/save/paste shortcuts. Requires *bare*
+    /// Control+A/C/S/V/X, remapped to Command+A/C/S/V/X in place — mirroring
+    /// Windows' select-all/copy/save/paste/cut shortcuts. Requires *bare*
     /// Control (no Shift/Option/Command riding along), so it never touches
     /// Ctrl+Shift+C (Inspect Element in every major browser) or any other
     /// Ctrl-based combo. "Control" here means whichever physical key(s) are
@@ -371,14 +371,15 @@ final class HotkeyEventTap {
     /// `Preferences.ctrlCVDenylistBundleIDs` — terminals need the literal
     /// Control+A (readline's "beginning of line"), Control+C (SIGINT),
     /// Control+S (XOFF — freezes terminal output until Control+Q, a classic
-    /// gotcha), and Control+V (raw paste); remote-desktop/VM consoles need
-    /// every one of these to reach the far end unaltered. Returns whether
-    /// the event was remapped.
+    /// gotcha), and Control+V (raw paste); Control+X has no special terminal
+    /// meaning but rides along on the same denylist for consistency;
+    /// remote-desktop/VM consoles need every one of these to reach the far
+    /// end unaltered. Returns whether the event was remapped.
     private func remapControlShortcuts(keyCode: Int, flags: CGEventFlags, event: CGEvent) -> Bool {
         guard Preferences.shared.ctrlCVRemapEnabled else { return false }
         guard
             keyCode == kVK_ANSI_A || keyCode == kVK_ANSI_C ||
-                keyCode == kVK_ANSI_S || keyCode == kVK_ANSI_V
+                keyCode == kVK_ANSI_S || keyCode == kVK_ANSI_V || keyCode == kVK_ANSI_X
         else {
             return false
         }

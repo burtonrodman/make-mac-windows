@@ -74,16 +74,18 @@ won't do anything if you've changed Spotlight's shortcut in System Settings
   activation history.
 - Single-monitor-aware centering (HUD centers on `NSScreen.main`).
 
-## Feature 4: Control+C / Control+V copy and paste
+## Feature 4: Control+C / Control+X / Control+V copy, cut, and paste
 
-Windows copies and pastes with Ctrl+C / Ctrl+V; the Mac equivalents are
-Cmd+C / Cmd+V. PCMode remaps the former to the latter almost everywhere —
-but "almost" is load-bearing here, since Control isn't an unclaimed modifier
-the way Option was for the window switcher:
+Windows copies, cuts, and pastes with Ctrl+C / Ctrl+X / Ctrl+V; the Mac
+equivalents are Cmd+C / Cmd+X / Cmd+V. PCMode remaps the former to the
+latter almost everywhere — but "almost" is load-bearing here, since Control
+isn't an unclaimed modifier the way Option was for the window switcher:
 
 - **Terminals** (Terminal.app, iTerm2, etc.) rely on the literal Ctrl+C as
   the interrupt signal (SIGINT) and sometimes Ctrl+V for a raw/literal paste
   — remapping those would break running processes, not just muscle memory.
+  Ctrl+X has no special terminal meaning, but rides along on the same
+  exclusion list for consistency.
 - **Remote-desktop and VM consoles** (Microsoft Remote Desktop, Screen
   Sharing, Parallels, VMware Fusion) need the literal keystroke to reach the
   guest OS/remote session, which may have its own idea of what Ctrl+C means.
@@ -93,10 +95,10 @@ apps above, plus a few more terminal emulators), editable from the menu-bar
 icon's **Manage Excluded Apps…** window (`SettingsWindowController.swift`)
 — add or remove apps there, or reset to the built-in defaults.
 
-The remap only fires for *bare* Control+C/V (no Shift/Option/Command riding
-along), so it never touches Ctrl+Shift+C — Inspect Element in every major
-browser — or any other Ctrl-based shortcut. Toggle the whole feature on/off
-from the menu-bar icon, independent of the exclusion list.
+The remap only fires for *bare* Control+C/X/V (no Shift/Option/Command
+riding along), so it never touches Ctrl+Shift+C — Inspect Element in every
+major browser — or any other Ctrl-based shortcut. Toggle the whole feature
+on/off from the menu-bar icon, independent of the exclusion list.
 
 ### Known limitation
 

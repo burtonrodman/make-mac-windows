@@ -76,11 +76,11 @@ final class StatusItemController {
 
         menu.addItem(.separator())
 
-        let copyPasteHeader = NSMenuItem(title: "Select All / Copy / Save / Paste", action: nil, keyEquivalent: "")
+        let copyPasteHeader = NSMenuItem(title: "Select All / Cut / Copy / Save / Paste", action: nil, keyEquivalent: "")
         copyPasteHeader.isEnabled = false
         menu.addItem(copyPasteHeader)
 
-        ctrlCVRemapToggleItem.title = "Control+A/C/S/V → Command+A/C/S/V"
+        ctrlCVRemapToggleItem.title = "Control+A/C/S/V/X → Command+A/C/S/V/X"
         ctrlCVRemapToggleItem.action = #selector(toggleCtrlCVRemap)
         ctrlCVRemapToggleItem.target = self
         menu.addItem(ctrlCVRemapToggleItem)
