@@ -53,6 +53,7 @@ final class Preferences {
     private let perAppKeyRemapsKey = "perAppKeyRemapsV1"
     private let ctrlF4ClosesTabKey = "ctrlF4ClosesTabEnabled"
     private let ctrlClickMultiSelectKey = "ctrlClickMultiSelectEnabled"
+    private let clickThroughActivationKey = "clickThroughActivationEnabled"
 
     /// Bundle identifiers exempted from the Control+A/C/S/V remap below —
     /// terminal emulators (where Control+A is readline's "beginning of
@@ -262,6 +263,25 @@ final class Preferences {
     var ctrlClickMultiSelectEnabled: Bool {
         get { defaults.object(forKey: ctrlClickMultiSelectKey) as? Bool ?? false }
         set { defaults.set(newValue, forKey: ctrlClickMultiSelectKey) }
+    }
+
+    /// On Windows, clicking an inactive window both activates it *and*
+    /// delivers the click. On macOS, activation and click delivery are two
+    /// separate questions the clicked app answers for itself
+    /// (`NSView.acceptsFirstMouse(with:)`, default `false`) — most non-Apple
+    /// apps treat the first click as activation-only, so a second click is
+    /// needed to actually press whatever was clicked. When this is on,
+    /// PCMode intercepts that first click itself, activates the target
+    /// window, and replays the click once the app is frontmost — see
+    /// `ClickThroughActivator`. Defaults **off**, like
+    /// `ctrlClickMultiSelectEnabled`: it's a systemwide change to how every
+    /// click behaves, with no per-app exclusion list, and — being a
+    /// swallow-then-synthesize hack rather than anything Apple exposes an
+    /// API for — it's inherently less bullet-proof than the keyboard remaps
+    /// above.
+    var clickThroughActivationEnabled: Bool {
+        get { defaults.object(forKey: clickThroughActivationKey) as? Bool ?? false }
+        set { defaults.set(newValue, forKey: clickThroughActivationKey) }
     }
 }
 

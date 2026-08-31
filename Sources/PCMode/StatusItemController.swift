@@ -9,7 +9,8 @@ import Cocoa
 /// tap-to-open-Spotlight toggles, the Control+A/C/S/V remap toggle, the
 /// Home/End line/document-navigation remap toggle, the Command+F4
 /// close-window toggle, the Control+F4-closes-tab toggle, the (off by
-/// default) Control+Click multi-select toggle, and Quit.
+/// default) Control+Click multi-select toggle, the (off by default,
+/// experimental) click-through-activation toggle, and Quit.
 final class StatusItemController {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     private let triggerOffItem = NSMenuItem()
@@ -22,6 +23,7 @@ final class StatusItemController {
     private let closeWindowToggleItem = NSMenuItem()
     private let ctrlF4ToggleItem = NSMenuItem()
     private let ctrlClickToggleItem = NSMenuItem()
+    private let clickThroughToggleItem = NSMenuItem()
 
     func setup() {
         if let button = statusItem.button {
@@ -126,6 +128,17 @@ final class StatusItemController {
         menu.addItem(ctrlClickToggleItem)
 
         menu.addItem(.separator())
+
+        let clickThroughHeader = NSMenuItem(title: "Click an Inactive Window", action: nil, keyEquivalent: "")
+        clickThroughHeader.isEnabled = false
+        menu.addItem(clickThroughHeader)
+
+        clickThroughToggleItem.title = "Clicking Focuses AND Interacts (Off by Default — Experimental)"
+        clickThroughToggleItem.action = #selector(toggleClickThroughActivation)
+        clickThroughToggleItem.target = self
+        menu.addItem(clickThroughToggleItem)
+
+        menu.addItem(.separator())
         menu.addItem(
             withTitle: "Quit PCMode",
             action: #selector(NSApplication.terminate(_:)),
@@ -186,6 +199,11 @@ final class StatusItemController {
         updateCheckmarks()
     }
 
+    @objc private func toggleClickThroughActivation() {
+        Preferences.shared.clickThroughActivationEnabled.toggle()
+        updateCheckmarks()
+    }
+
     @objc private func showSettings() {
         SettingsWindowController.shared.show()
     }
@@ -203,5 +221,6 @@ final class StatusItemController {
         closeWindowToggleItem.state = Preferences.shared.closeWindowShortcutEnabled ? .on : .off
         ctrlF4ToggleItem.state = Preferences.shared.ctrlF4ClosesTabEnabled ? .on : .off
         ctrlClickToggleItem.state = Preferences.shared.ctrlClickMultiSelectEnabled ? .on : .off
+        clickThroughToggleItem.state = Preferences.shared.clickThroughActivationEnabled ? .on : .off
     }
 }

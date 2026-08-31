@@ -197,7 +197,18 @@ final class HotkeyEventTap {
         }
 
         if type == .leftMouseDown || type == .leftMouseUp {
+            // Control+Click remapping applies (if enabled) before the
+            // click-through check below, so a swallowed-then-replayed click
+            // still carries Command instead of Control when it's replayed.
             _ = remapControlClick(event: event)
+
+            if type == .leftMouseDown, !isScreenSharingFullScreen(),
+                ClickThroughActivator.shared.handleMouseDown(event: event) {
+                return nil
+            }
+            if type == .leftMouseUp, ClickThroughActivator.shared.handleMouseUp() {
+                return nil
+            }
             return Unmanaged.passUnretained(event)
         }
 
@@ -280,9 +291,12 @@ final class HotkeyEventTap {
     /// equivalents) passes through unswallowed instead of popping this
     /// Mac's own switcher panel open on top of someone else's screen — the
     /// remote Mac (if it's running PCMode too) should get the keystroke
-    /// instead. Only gates the switcher itself; every other remap
-    /// (snap/close-window/Ctrl+C+V+X/etc.) is unaffected, since Screen
-    /// Sharing is already in `Preferences.defaultCtrlCVDenylist` for those.
+    /// instead. Also gates `ClickThroughActivator`, for the same reason: a
+    /// click meant for the remote desktop shouldn't be swallowed and
+    /// replayed as if it were aimed at a local background window. Every
+    /// other remap (snap/close-window/Ctrl+C+V+X/etc.) is unaffected, since
+    /// Screen Sharing is already in `Preferences.defaultCtrlCVDenylist` for
+    /// those.
     private func isScreenSharingFullScreen() -> Bool {
         guard
             let app = NSWorkspace.shared.frontmostApplication,

@@ -145,6 +145,32 @@ default the way the keyboard remaps are. Toggle it from the menu bar's
 "List Multi-Select" section — see `Preferences.ctrlClickMultiSelectEnabled`
 and `HotkeyEventTap.remapControlClick`.
 
+## Feature 6: click an inactive window to focus *and* interact with it (off by default, experimental)
+
+On Windows, clicking an inactive window always both activates it and
+delivers the click — one motion, one result. On macOS, clicking a
+background window does activate it, but whether that same click also
+*does* anything is a per-app choice
+(`NSView.acceptsFirstMouse(with:)`, which defaults to `false`): most
+non-Apple apps treat the first click as activation-only, so a second click
+is needed to actually press the button/link/tab you clicked.
+
+There's no public API to change that from outside another app, so PCMode
+works around it instead: it intercepts the click itself, and if it lands on
+a window that isn't already the frontmost app's focused window, swallows
+that click, raises/focuses the target window, and replays the click once
+the app is frontmost — indistinguishable, from the app's point of view,
+from an ordinary first click. Dragging an inactive window into place by its
+title bar (activate-and-drag in one motion) works the same way, since real
+`mouseDragged`/`mouseUp` events are left alone once the replayed click has
+started the gesture.
+
+This is a hack — there's no API for "activate and also deliver this
+click" — so unlike the keyboard remaps above, **it defaults off** and has
+no per-app exclusion list, the same reasoning as Feature 5's Control+Click
+remap. Toggle it from the menu bar's "Click an Inactive Window" section.
+See `ClickThroughActivator.swift`.
+
 ## Required permissions
 
 PCMode needs two permissions, both requested automatically on first launch:
