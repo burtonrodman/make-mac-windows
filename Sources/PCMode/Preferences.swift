@@ -52,6 +52,7 @@ final class Preferences {
     private let perAppKeyRemapKey = "perAppKeyRemapEnabled"
     private let perAppKeyRemapsKey = "perAppKeyRemapsV1"
     private let ctrlF4ClosesTabKey = "ctrlF4ClosesTabEnabled"
+    private let ctrlClickMultiSelectKey = "ctrlClickMultiSelectEnabled"
 
     /// Bundle identifiers exempted from the Control+A/C/S/V remap below —
     /// terminal emulators (where Control+A is readline's "beginning of
@@ -59,18 +60,38 @@ final class Preferences {
     /// output until Control+Q — and Control+V can mean "paste literally")
     /// and remote-desktop/VM consoles (where the literal keystroke needs to
     /// reach the far end), seeded in on first launch. User-editable in the
-    /// Settings window (`SettingsWindowController`).
+    /// Settings window (`SettingsWindowController`). VS Code isn't here: it's
+    /// covered instead by `fullyExcludedBundleIDs` below, since it needs the
+    /// same protection for far more than just this one remap.
     static let defaultCtrlCVDenylist = [
         "com.apple.Terminal",
         "com.googlecode.iterm2",
         "com.github.wez.wezterm",
         "net.kovidgoyal.kitty",
         "co.zeit.hyper",
-        "com.microsoft.VSCode",
         "com.microsoft.rdc.macos",
         "com.apple.ScreenSharing",
         "com.parallels.desktop.console",
         "com.vmware.fusion",
+    ]
+
+    /// Bundle identifiers fully excluded from every PCMode keyboard
+    /// behavior — the switcher, tap-for-Spotlight, snap shortcuts, and every
+    /// remap below — rather than being carved out shortcut-by-shortcut like
+    /// `defaultCtrlCVDenylist`. Currently just VS Code: its own keybinding
+    /// surface is enormous and user-customizable, and (via its integrated
+    /// terminal) the same "needs the literal keystroke" problem that
+    /// motivates `defaultCtrlCVDenylist` applies to far more than Control+A/
+    /// C/S/V/X there. Not user-editable — a fixed exclusion, unlike
+    /// `ctrlCVDenylistBundleIDs`. Users who want Windows-familiar shortcuts
+    /// inside VS Code anyway should install the `vscode-windows-keymap`
+    /// extension (see repo root) instead — VS Code's own `"when"` context
+    /// clauses (`terminalFocus`, `editorTextFocus`) can distinguish the
+    /// integrated terminal from the editor exactly, which is more complete
+    /// and more reliable than anything PCMode could do from outside via
+    /// Accessibility.
+    static let fullyExcludedBundleIDs = [
+        "com.microsoft.VSCode",
     ]
 
     private init() {
@@ -222,6 +243,25 @@ final class Preferences {
     var ctrlF4ClosesTabEnabled: Bool {
         get { defaults.object(forKey: ctrlF4ClosesTabKey) as? Bool ?? true }
         set { defaults.set(newValue, forKey: ctrlF4ClosesTabKey) }
+    }
+
+    /// Control+Click remapped to Command+Click in place, mirroring Windows'
+    /// (and most everywhere else's) convention for toggling one item into a
+    /// discontiguous multi-selection in a list — Mac's equivalent is
+    /// Command+Click. Unlike every other remap in this file, this defaults
+    /// **off**: literal Control+Click is macOS's own long-standing
+    /// secondary-click ("right-click") substitute, honored by AppKit and by
+    /// most Electron/Chromium apps too, not something scoped to a handful of
+    /// terminal-like apps — so unlike Control+A/C/S/V/X, there's no sane
+    /// denylist here, since nearly *every* app relies on it to some degree.
+    /// Turning this on trades that away everywhere in exchange for
+    /// Windows-style multi-select; worth it once you know you don't lean on
+    /// Ctrl+Click for context menus (e.g. you already have a working
+    /// right-click), not a safe default for everyone. See
+    /// `HotkeyEventTap.remapControlClick`.
+    var ctrlClickMultiSelectEnabled: Bool {
+        get { defaults.object(forKey: ctrlClickMultiSelectKey) as? Bool ?? false }
+        set { defaults.set(newValue, forKey: ctrlClickMultiSelectKey) }
     }
 }
 

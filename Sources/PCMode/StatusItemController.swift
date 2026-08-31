@@ -8,7 +8,8 @@ import Cocoa
 /// per-monitor zone editor — the switcher's trigger, the
 /// tap-to-open-Spotlight toggles, the Control+A/C/S/V remap toggle, the
 /// Home/End line/document-navigation remap toggle, the Command+F4
-/// close-window toggle, the Control+F4-closes-tab toggle, and Quit.
+/// close-window toggle, the Control+F4-closes-tab toggle, the (off by
+/// default) Control+Click multi-select toggle, and Quit.
 final class StatusItemController {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     private let triggerOffItem = NSMenuItem()
@@ -20,6 +21,7 @@ final class StatusItemController {
     private let homeEndRemapToggleItem = NSMenuItem()
     private let closeWindowToggleItem = NSMenuItem()
     private let ctrlF4ToggleItem = NSMenuItem()
+    private let ctrlClickToggleItem = NSMenuItem()
 
     func setup() {
         if let button = statusItem.button {
@@ -113,6 +115,17 @@ final class StatusItemController {
         menu.addItem(ctrlF4ToggleItem)
 
         menu.addItem(.separator())
+
+        let ctrlClickHeader = NSMenuItem(title: "List Multi-Select", action: nil, keyEquivalent: "")
+        ctrlClickHeader.isEnabled = false
+        menu.addItem(ctrlClickHeader)
+
+        ctrlClickToggleItem.title = "Control+Click → Command+Click (Off by Default — Disables Ctrl+Click as Right-Click)"
+        ctrlClickToggleItem.action = #selector(toggleCtrlClickMultiSelect)
+        ctrlClickToggleItem.target = self
+        menu.addItem(ctrlClickToggleItem)
+
+        menu.addItem(.separator())
         menu.addItem(
             withTitle: "Quit PCMode",
             action: #selector(NSApplication.terminate(_:)),
@@ -168,6 +181,11 @@ final class StatusItemController {
         updateCheckmarks()
     }
 
+    @objc private func toggleCtrlClickMultiSelect() {
+        Preferences.shared.ctrlClickMultiSelectEnabled.toggle()
+        updateCheckmarks()
+    }
+
     @objc private func showSettings() {
         SettingsWindowController.shared.show()
     }
@@ -184,5 +202,6 @@ final class StatusItemController {
         homeEndRemapToggleItem.state = Preferences.shared.homeEndRemapEnabled ? .on : .off
         closeWindowToggleItem.state = Preferences.shared.closeWindowShortcutEnabled ? .on : .off
         ctrlF4ToggleItem.state = Preferences.shared.ctrlF4ClosesTabEnabled ? .on : .off
+        ctrlClickToggleItem.state = Preferences.shared.ctrlClickMultiSelectEnabled ? .on : .off
     }
 }

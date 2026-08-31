@@ -3,3 +3,4 @@
 dist/
 *.xcuserstate
 .DS_Store
+vscode-windows-keymap/*.vsix

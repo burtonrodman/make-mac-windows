@@ -101,7 +101,8 @@ final class HotkeyEventTap {
         teardown()
 
         let eventMask =
-            (1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.flagsChanged.rawValue)
+            (1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.flagsChanged.rawValue) |
+            (1 << CGEventType.leftMouseDown.rawValue) | (1 << CGEventType.leftMouseUp.rawValue)
 
         guard
             let tap = CGEvent.tapCreate(
@@ -192,6 +193,11 @@ final class HotkeyEventTap {
                     triggerIsDown = true
                 }
             }
+            return Unmanaged.passUnretained(event)
+        }
+
+        if type == .leftMouseDown || type == .leftMouseUp {
+            _ = remapControlClick(event: event)
             return Unmanaged.passUnretained(event)
         }
 
@@ -401,8 +407,9 @@ final class HotkeyEventTap {
             return false
         }
 
-        if let bundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
-            Preferences.shared.ctrlCVDenylistBundleIDs.contains(bundleID)
+        guard let bundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier else { return false }
+        if Preferences.shared.ctrlCVDenylistBundleIDs.contains(bundleID) ||
+            Preferences.fullyExcludedBundleIDs.contains(bundleID)
         {
             return false
         }
@@ -437,6 +444,12 @@ final class HotkeyEventTap {
             return false
         }
 
+        if let bundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
+            Preferences.fullyExcludedBundleIDs.contains(bundleID)
+        {
+            return false
+        }
+
         event.setIntegerValueField(.keyboardEventKeycode, value: Int64(kVK_ANSI_W))
         event.flags = remaining.union(.maskCommand)
         return true
@@ -464,6 +477,12 @@ final class HotkeyEventTap {
         case kVK_Home: newKeyCode = isDocument ? kVK_UpArrow : kVK_LeftArrow
         case kVK_End: newKeyCode = isDocument ? kVK_DownArrow : kVK_RightArrow
         default: return false
+        }
+
+        if let bundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
+            Preferences.fullyExcludedBundleIDs.contains(bundleID)
+        {
+            return false
         }
 
         event.setIntegerValueField(.keyboardEventKeycode, value: Int64(newKeyCode))
@@ -500,6 +519,38 @@ final class HotkeyEventTap {
 
         event.setIntegerValueField(.keyboardEventKeycode, value: Int64(rule.toKeyCode))
         event.flags = rule.toFlags
+        return true
+    }
+
+    /// Control+Click remapped to Command+Click in place — mirroring
+    /// Windows' convention for toggling one item into a discontiguous
+    /// multi-selection in a list (Explorer, and virtually every other app),
+    /// which is Command+Click on Mac. Requires *bare* Control, same
+    /// rationale as `remapControlShortcuts`, and applies system-wide with no
+    /// denylist when on — see `Preferences.ctrlClickMultiSelectEnabled` for
+    /// why this one defaults off and has no per-app exclusions: Control+Click
+    /// is macOS's own secondary-click substitute almost everywhere, so
+    /// there's no small set of apps to carve out the way terminals were for
+    /// Control+A/C/S/V/X. Returns whether the event was remapped.
+    private func remapControlClick(event: CGEvent) -> Bool {
+        guard Preferences.shared.ctrlClickMultiSelectEnabled else { return false }
+
+        let flags = event.flags
+        let controlSlots = Preferences.shared.slotsHeld(inBucket: .control, flags: flags)
+        guard !controlSlots.isEmpty else { return false }
+
+        var remaining = flags
+        for slot in controlSlots { remaining.subtract(slot.flagBits) }
+        guard
+            !remaining.contains(.maskControl),
+            !remaining.contains(.maskCommand),
+            !remaining.contains(.maskShift),
+            !remaining.contains(.maskAlternate)
+        else {
+            return false
+        }
+
+        event.flags = remaining.union(.maskCommand)
         return true
     }
 

@@ -100,16 +100,50 @@ riding along), so it never touches Ctrl+Shift+C — Inspect Element in every
 major browser — or any other Ctrl-based shortcut. Toggle the whole feature
 on/off from the menu-bar icon, independent of the exclusion list.
 
-### Known limitation
+### VS Code: fully excluded — use the companion keymap extension instead
 
 Apps that host more than one kind of view under one bundle ID — most
 notably VS Code, whose editor and integrated terminal are the same process
-— can't be split by this exclusion list, since the event tap only knows
-which *app* is frontmost, not which view inside it has focus. Excluding VS
-Code protects its terminal's Ctrl+C but also means its editor pane won't
-get the remap; leaving it off the list gets editor remapping but risks the
-terminal's Ctrl+C. VS Code ships on the exclusion list by default (terminal
-safety wins), but either way is a one-line edit in the Settings window.
+— can't be split by a simple app-level exclusion list, since the event tap
+only knows which *app* is frontmost, not which view inside it has focus.
+Rather than pick one side of that tradeoff, VS Code is fully excluded from
+every PCMode keystroke remap (Control+A/C/S/V/X, Home/End, and
+Control+F4-closes-tab; the window switcher, tap-for-Spotlight, and snap
+shortcuts are unaffected, since none of those collide with anything VS Code
+itself binds) — see `Preferences.fullyExcludedBundleIDs`.
+
+Windows-style shortcuts *inside* VS Code are handled instead by
+[`vscode-windows-keymap/`](vscode-windows-keymap/), a small companion VS
+Code extension (same idea as the "Sublime Text Keymap" or "Atom Keymap"
+extensions) rather than a PCMode feature. It rebinds the ~100 commands
+Windows and macOS default to different keys for — Quick Open, cut/copy/
+paste, multi-cursor, panel toggles, editor-group navigation, and more —
+using VS Code's own `"when"` context clauses (`terminalFocus`,
+`editorTextFocus`) to distinguish the integrated terminal from the editor
+*exactly*, which is more complete and more reliable than anything PCMode
+could do from outside via Accessibility. See that extension's README for
+install steps and known OS-level caveats (a few Windows shortcuts collide
+with macOS's own Mission Control bindings and can't be fixed from within
+VS Code).
+
+## Feature 5: Control+Click for list multi-select (off by default)
+
+Windows' (and most other platforms') convention for toggling one item into
+a discontiguous multi-selection in a list is Ctrl+Click; the Mac equivalent
+is Cmd+Click. PCMode can remap the former to the latter, system-wide, the
+same way it does Control+A/C/S/V/X — but unlike that remap, **this one
+defaults off**, and there's no per-app exclusion list, because the
+tradeoff is a different shape entirely: literal Control+Click is macOS's
+own long-standing secondary-click ("right-click") substitute, honored by
+AppKit and by most Electron/Chromium apps too — not a handful of
+terminal-like apps that need carving out, but something close to *every*
+app to some degree. Turning this on trades away Ctrl+Click-as-right-click
+everywhere in exchange for Windows-style multi-select; worth it once you
+know you don't lean on Ctrl+Click for context menus (most people with a
+working right-click already don't), but not a safe thing to turn on by
+default the way the keyboard remaps are. Toggle it from the menu bar's
+"List Multi-Select" section — see `Preferences.ctrlClickMultiSelectEnabled`
+and `HotkeyEventTap.remapControlClick`.
 
 ## Required permissions
 
