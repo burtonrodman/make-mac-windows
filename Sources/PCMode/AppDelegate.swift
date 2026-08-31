@@ -29,6 +29,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         HotkeyEventTap.shared.onCloseWindow = {
             WindowCloser.closeFocusedWindow()
         }
+        HotkeyEventTap.shared.onLockScreen = {
+            LockScreenLocker.lock()
+        }
         SwitcherController.shared.start()
         startPermissionPollingIfNeeded()
     }

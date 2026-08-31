@@ -92,6 +92,9 @@ final class HotkeyEventTap {
     /// so it doesn't collide with Option's tap-for-Spotlight/switcher/snap
     /// duties.
     var onCloseWindow: (() -> Void)?
+    /// Fired on Start-role-key+L — locks the screen, mirroring Windows'
+    /// Win+L (Left Option by default; see `ModifierKeys.swift`).
+    var onLockScreen: (() -> Void)?
 
     private init() {}
 
@@ -221,6 +224,10 @@ final class HotkeyEventTap {
             }
 
             if handleCloseWindowKey(keyCode: keyCode, flags: flags) {
+                return nil
+            }
+
+            if handleLockScreenKey(keyCode: keyCode, flags: flags) {
                 return nil
             }
 
@@ -377,6 +384,21 @@ final class HotkeyEventTap {
         else { return false }
 
         onCloseWindow?()
+        return true
+    }
+
+    /// Start-role-key+L locks the screen — mirroring Windows' Win+L, bound
+    /// to the Start bucket like the window switcher/tap-for-Spotlight/snap
+    /// shortcuts (Left Option by default; see `ModifierKeys.swift`).
+    /// Returns whether the event was consumed.
+    private func handleLockScreenKey(keyCode: Int, flags: CGEventFlags) -> Bool {
+        guard
+            Preferences.shared.lockScreenShortcutEnabled,
+            keyCode == kVK_ANSI_L,
+            Preferences.shared.isBucketHeld(.start, in: flags)
+        else { return false }
+
+        onLockScreen?()
         return true
     }
 

@@ -49,6 +49,7 @@ final class Preferences {
     private let ctrlCVDenylistKey = "ctrlCVDenylistBundleIDs"
     private let homeEndRemapKey = "homeEndRemapEnabled"
     private let closeWindowShortcutKey = "closeWindowShortcutEnabled"
+    private let lockScreenShortcutKey = "lockScreenShortcutEnabled"
     private let perAppKeyRemapKey = "perAppKeyRemapEnabled"
     private let perAppKeyRemapsKey = "perAppKeyRemapsV1"
     private let ctrlF4ClosesTabKey = "ctrlF4ClosesTabEnabled"
@@ -201,6 +202,15 @@ final class Preferences {
     var closeWindowShortcutEnabled: Bool {
         get { defaults.object(forKey: closeWindowShortcutKey) as? Bool ?? true }
         set { defaults.set(newValue, forKey: closeWindowShortcutKey) }
+    }
+
+    /// Start-role-key+L locks the screen, mirroring Windows' Win+L (Left
+    /// Option by default; see `ModifierKeys.swift`). Defaults on, like the
+    /// other Start-bucket shortcuts. See
+    /// `HotkeyEventTap.handleLockScreenKey` / `LockScreenLocker`.
+    var lockScreenShortcutEnabled: Bool {
+        get { defaults.object(forKey: lockScreenShortcutKey) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: lockScreenShortcutKey) }
     }
 
     /// Per-app literal-keystroke remaps — e.g. Chrome's Ctrl+H (History)

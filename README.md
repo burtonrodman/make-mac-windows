@@ -126,6 +126,19 @@ install steps and known OS-level caveats (a few Windows shortcuts collide
 with macOS's own Mission Control bindings and can't be fixed from within
 VS Code).
 
+## Feature 4b: Start key + L locks the screen
+
+Windows locks the screen with Win+L. PCMode mirrors this with **Start-role-key
++ L** (Left Option by default; see `ModifierKeys.swift`) — the same bucket
+that drives the window switcher, tap-for-Spotlight, and window snap.
+Implemented in `LockScreenLocker.swift` by simulating macOS's own default
+Lock Screen shortcut, Control+Command+Q — there's no public API to lock the
+screen directly, so this won't do anything if you've changed Lock Screen's
+shortcut in System Settings > Keyboard > Keyboard Shortcuts > Lock Screen.
+Toggle it from the menu bar's "Lock Screen" section; defaults on, like the
+other keyboard remaps. See `Preferences.lockScreenShortcutEnabled` and
+`HotkeyEventTap.handleLockScreenKey`.
+
 ## Feature 5: Control+Click for list multi-select (off by default)
 
 Windows' (and most other platforms') convention for toggling one item into
