@@ -118,18 +118,24 @@ final class ClickThroughActivator {
             return nil
         }
 
-        // Front-to-back order — the first ordinary (layer 0) window whose
-        // bounds contain the point is what the click actually lands on.
+        // Front-to-back order — whatever's truly topmost at the point is
+        // what the click actually lands on.
         guard
             let hit = rawList.first(where: { entry in
-                guard
-                    let layer = entry[kCGWindowLayer as String] as? Int, layer == 0,
-                    let bounds = Self.bounds(from: entry)
-                else {
-                    return false
-                }
-                return bounds.contains(point)
-            }),
+                Self.bounds(from: entry)?.contains(point) ?? false
+            })
+        else {
+            return nil
+        }
+        // Only an ordinary (layer 0) window is a background *app* window we
+        // can usefully activate. If the topmost thing here is anything else
+        // — an open menu (pulldown/popup), the menu bar itself, a status-item
+        // popover, the Dock — that's what will actually receive the click,
+        // so leave it alone rather than skipping past it to a window
+        // further back (which would swallow the real click and misdirect
+        // activation to that background window instead).
+        guard
+            let layer = hit[kCGWindowLayer as String] as? Int, layer == 0,
             let ownerPID = hit[kCGWindowOwnerPID as String] as? Int,
             pid_t(ownerPID) != ownPID,
             let windowNumber = hit[kCGWindowNumber as String] as? Int
