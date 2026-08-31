@@ -205,7 +205,7 @@ final class HotkeyEventTap {
             // still carries Command instead of Control when it's replayed.
             _ = remapControlClick(event: event)
 
-            if type == .leftMouseDown, !isScreenSharingFullScreen(),
+            if type == .leftMouseDown, !shouldPassthroughToScreenSharing(),
                 ClickThroughActivator.shared.handleMouseDown(event: event) {
                 return nil
             }
@@ -255,7 +255,7 @@ final class HotkeyEventTap {
                 return Unmanaged.passUnretained(event)
             }
 
-            if let triggerBucket = Preferences.shared.switcherTrigger.bucket, !isScreenSharingFullScreen() {
+            if let triggerBucket = Preferences.shared.switcherTrigger.bucket, !shouldPassthroughToScreenSharing() {
                 let triggerHeld = Preferences.shared.isBucketHeld(triggerBucket, in: flags)
                 if keyCode == kVK_Tab, triggerHeld {
                     onTabDown?(flags.contains(.maskShift))
@@ -291,25 +291,31 @@ final class HotkeyEventTap {
         return Unmanaged.passUnretained(event)
     }
 
-    /// True when Screen Sharing is both frontmost and its window is
-    /// currently full-screen — meaning this Mac is being used to view
-    /// another Mac's desktop, which now fills the display. Consulted by the
-    /// switcher-trigger handling above so trigger+Tab (and the arrow-key
-    /// equivalents) passes through unswallowed instead of popping this
-    /// Mac's own switcher panel open on top of someone else's screen — the
-    /// remote Mac (if it's running PCMode too) should get the keystroke
-    /// instead. Also gates `ClickThroughActivator`, for the same reason: a
-    /// click meant for the remote desktop shouldn't be swallowed and
-    /// replayed as if it were aimed at a local background window. Every
-    /// other remap (snap/close-window/Ctrl+C+V+X/etc.) is unaffected, since
-    /// Screen Sharing is already in `Preferences.defaultCtrlCVDenylist` for
-    /// those.
-    private func isScreenSharingFullScreen() -> Bool {
+    /// True when Screen Sharing is frontmost and (depending on
+    /// `Preferences.screenSharingPassthroughFullScreenOnly`) either simply
+    /// frontmost or specifically full-screen — meaning this Mac is being
+    /// used to view another Mac's desktop. Consulted by the switcher-trigger
+    /// handling above so trigger+Tab (and the arrow-key equivalents) passes
+    /// through unswallowed instead of popping this Mac's own switcher panel
+    /// open on top of someone else's screen — the remote Mac (if it's
+    /// running PCMode too) should get the keystroke instead. Also gates
+    /// `ClickThroughActivator`, for the same reason: a click meant for the
+    /// remote desktop shouldn't be swallowed and replayed as if it were
+    /// aimed at a local background window. Every other remap
+    /// (snap/close-window/Ctrl+C+V+X/etc.) is unaffected, since Screen
+    /// Sharing is already in `Preferences.defaultCtrlCVDenylist` for those.
+    private func shouldPassthroughToScreenSharing() -> Bool {
         guard
             let app = NSWorkspace.shared.frontmostApplication,
             app.bundleIdentifier == "com.apple.ScreenSharing"
         else {
             return false
+        }
+
+        // Default (and recommended) case: any Screen Sharing window,
+        // windowed or full-screen, is enough to pass the keystroke through.
+        guard Preferences.shared.screenSharingPassthroughFullScreenOnly else {
+            return true
         }
 
         let appElement = AXUIElementCreateApplication(app.processIdentifier)

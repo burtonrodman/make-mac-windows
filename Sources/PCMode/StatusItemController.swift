@@ -11,7 +11,9 @@ import Cocoa
 /// close-window toggle, the Control+F4-closes-tab toggle, the Start
 /// Key+L-locks-the-screen toggle, the (off by default) Control+Click
 /// multi-select toggle, the (off by default, experimental)
-/// click-through-activation toggle, and Quit.
+/// click-through-activation toggle, and Quit. Screen Sharing passthrough
+/// lives in the Settings window's "Screen Sharing" tab instead
+/// (`SettingsWindowController`), not here.
 final class StatusItemController {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     private let triggerOffItem = NSMenuItem()

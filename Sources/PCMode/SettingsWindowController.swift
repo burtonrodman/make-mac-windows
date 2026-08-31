@@ -14,7 +14,11 @@ import UniformTypeIdentifiers
 /// `PerAppMappingEditorSheet`; and "Snap Zones" — the Option+Arrow
 /// snap/cycle shortcut's on/off switch alongside its per-monitor zone editor
 /// (1-3 draggable left-to-right zones per screen), previously its own
-/// separate window.
+/// separate window; and "Screen Sharing" — whether passthrough to a remote
+/// Screen Sharing session (see `HotkeyEventTap.shouldPassthroughToScreenSharing`
+/// and `Preferences.screenSharingPassthroughFullScreenOnly`) requires Screen
+/// Sharing's window to be full-screen, or fires whenever it's simply
+/// frontmost.
 ///
 /// A plain programmatic `NSWindow` (no nib/storyboard), matching the rest of
 /// PCMode's UI (`SwitcherPanel`). Kept alive as a singleton so the window
@@ -50,6 +54,11 @@ final class SettingsWindowController: NSWindowController {
     private var snapStripViews: [CGDirectDisplayID: SnapZoneStripView] = [:]
     private var snapCountPopups: [CGDirectDisplayID: NSPopUpButton] = [:]
 
+    private let screenSharingFullScreenOnlyCheckbox = NSButton(
+        checkboxWithTitle: "Require Full Screen (Off by Default — Also Passes Through When Windowed)",
+        target: nil, action: nil
+    )
+
     private convenience init() {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 480, height: 560),
@@ -83,6 +92,8 @@ final class SettingsWindowController: NSWindowController {
         perAppEnabledCheckbox.state = Preferences.shared.perAppKeyRemapEnabled ? .on : .off
         snapShortcutsCheckbox.state = Preferences.shared.snapShortcutsEnabled ? .on : .off
         rebuildSnapZoneRows()
+        screenSharingFullScreenOnlyCheckbox.state =
+            Preferences.shared.screenSharingPassthroughFullScreenOnly ? .on : .off
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
     }
@@ -96,6 +107,7 @@ final class SettingsWindowController: NSWindowController {
         tabView.addTabViewItem(makeTab(title: "Excluded Apps", content: buildExcludedAppsSection()))
         tabView.addTabViewItem(makeTab(title: "Per-App Mappings", content: buildPerAppMappingsSection()))
         tabView.addTabViewItem(makeTab(title: "Snap Zones", content: buildSnapSection()))
+        tabView.addTabViewItem(makeTab(title: "Screen Sharing", content: buildScreenSharingSection()))
 
         contentView.addSubview(tabView)
         NSLayoutConstraint.activate([
@@ -536,6 +548,44 @@ final class SettingsWindowController: NSWindowController {
 
     private func commitSnapSplits(_ splits: [CGFloat], forDisplayID displayID: CGDirectDisplayID) {
         Preferences.shared.setSnapZoneSplits(splits, forDisplayID: displayID)
+    }
+
+    /// Whether the window-switcher trigger, snap shortcuts, and
+    /// click-through activation pass through to a remote Screen Sharing
+    /// session whenever Screen Sharing is merely frontmost (the default), or
+    /// only once its window is in true full-screen mode. See
+    /// `HotkeyEventTap.shouldPassthroughToScreenSharing`.
+    private func buildScreenSharingSection() -> NSView {
+        let heading = NSTextField(labelWithString: "Screen Sharing")
+        heading.font = .boldSystemFont(ofSize: 13)
+
+        let explanation = NSTextField(wrappingLabelWithString:
+            "While Screen Sharing is frontmost, PCMode lets the window-switcher trigger, " +
+                "snap shortcuts, and click-through activation pass through untouched instead " +
+                "of acting on this Mac — so the remote Mac (if it's running PCMode too) gets " +
+                "them instead. By default that happens whether Screen Sharing is windowed or " +
+                "full-screen; turn this on to restrict it to full-screen only.")
+        explanation.font = .systemFont(ofSize: 11)
+        explanation.textColor = .secondaryLabelColor
+
+        screenSharingFullScreenOnlyCheckbox.target = self
+        screenSharingFullScreenOnlyCheckbox.action = #selector(screenSharingFullScreenOnlyToggled)
+
+        let stack = NSStackView(views: [heading, explanation, screenSharingFullScreenOnlyCheckbox])
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 12
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            heading.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            explanation.widthAnchor.constraint(equalTo: stack.widthAnchor),
+        ])
+        return stack
+    }
+
+    @objc private func screenSharingFullScreenOnlyToggled() {
+        Preferences.shared.screenSharingPassthroughFullScreenOnly =
+            screenSharingFullScreenOnlyCheckbox.state == .on
     }
 }
 

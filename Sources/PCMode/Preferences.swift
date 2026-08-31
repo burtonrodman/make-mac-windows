@@ -55,6 +55,7 @@ final class Preferences {
     private let ctrlF4ClosesTabKey = "ctrlF4ClosesTabEnabled"
     private let ctrlClickMultiSelectKey = "ctrlClickMultiSelectEnabled"
     private let clickThroughActivationKey = "clickThroughActivationEnabled"
+    private let screenSharingPassthroughFullScreenOnlyKey = "screenSharingPassthroughFullScreenOnly"
 
     /// Bundle identifiers exempted from the Control+A/C/S/V remap below —
     /// terminal emulators (where Control+A is readline's "beginning of
@@ -292,6 +293,27 @@ final class Preferences {
     var clickThroughActivationEnabled: Bool {
         get { defaults.object(forKey: clickThroughActivationKey) as? Bool ?? false }
         set { defaults.set(newValue, forKey: clickThroughActivationKey) }
+    }
+
+    /// Whether passthrough to a remote Screen Sharing session (see
+    /// `HotkeyEventTap.shouldPassthroughToScreenSharing`) requires Screen
+    /// Sharing's window to be in true full-screen mode, or fires whenever
+    /// Screen Sharing is simply the frontmost app — windowed included.
+    /// Defaults to `false` (passthrough whenever Screen Sharing is
+    /// frontmost, windowed or full-screen), since the point of
+    /// passthrough — letting the remote Mac's own keystroke handling (its
+    /// own PCMode, if it's running that too, or just the OS) see the
+    /// switcher-trigger/snap/click-through gestures instead of this Mac
+    /// swallowing them for its own local windows — applies just as much to
+    /// a windowed Screen Sharing session as a full-screen one, and running
+    /// Screen Sharing in a plain window is at least as common as dedicating
+    /// a full Space to it. Set `true` to restore the original, more
+    /// conservative behavior (full-screen only) if you'd rather keep your
+    /// local switcher/snap/click-through active while Screen Sharing is
+    /// merely one window among others.
+    var screenSharingPassthroughFullScreenOnly: Bool {
+        get { defaults.object(forKey: screenSharingPassthroughFullScreenOnlyKey) as? Bool ?? false }
+        set { defaults.set(newValue, forKey: screenSharingPassthroughFullScreenOnlyKey) }
     }
 }
 
