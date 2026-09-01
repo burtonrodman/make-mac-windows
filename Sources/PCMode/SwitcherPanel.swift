@@ -52,7 +52,7 @@ final class SwitcherPanel: NSPanel {
             // entirely at the low end of the scale range rather than
             // shrinking in exact proportion to the thumbnails.
             cellPadding = max(6, 12 * scale)
-            badgeSize = max(28, 50 * scale)
+            badgeSize = max(72, 132 * scale)
             captionIconSize = max(14, 18 * scale)
             captionSpacing = 8 * scale
             itemSpacing = max(8, 16 * scale)
@@ -491,6 +491,7 @@ final class SwitcherPanel: NSPanel {
         // there's no real thumbnail, since the fallback *is* the app icon.
         if preview != nil {
             let badge = NSImageView(image: window.icon)
+            badge.imageScaling = .scaleProportionallyUpOrDown
             badge.wantsLayer = true
             badge.layer?.shadowColor = NSColor.black.cgColor
             badge.layer?.shadowOpacity = 0.5
