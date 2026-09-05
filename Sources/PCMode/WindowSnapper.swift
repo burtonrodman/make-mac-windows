@@ -20,6 +20,16 @@ enum WindowSnapper {
         case next, previous
     }
 
+    /// Which zone (index into `SnapZones.allZonesOrdered()`) the window we
+    /// most recently snapped now sits in, so a second Start+Arrow press can
+    /// advance from it even if the window's *live* AX frame no longer
+    /// matches that zone's rect closely enough for `rectsApproximatelyEqual`
+    /// (see `trackedZoneIndex`). `AXUIElement` doesn't conform to
+    /// `Equatable` in Swift, so identity is compared with `CFEqual` rather
+    /// than stored as a dictionary key.
+    private static var lastSnappedWindow: AXUIElement?
+    private static var lastSnappedZoneIndex: Int?
+
     /// Steps the frontmost window forward/backward through every configured
     /// snap zone on every monitor (`SnapZones.allZonesOrdered()`), wrapping
     /// around at either end — mirroring Windows' Win+Left/Right, generalized
@@ -38,11 +48,16 @@ enum WindowSnapper {
         let zones = SnapZones.allZonesOrdered()
         guard !zones.isEmpty, let frame = currentCocoaFrame(of: window) else { return }
 
-        if let currentIndex = zones.firstIndex(where: { rectsApproximatelyEqual($0.frame, frame) }) {
+        let matchedIndex = zones.firstIndex(where: { rectsApproximatelyEqual($0.frame, frame) })
+            ?? trackedZoneIndex(for: window, currentFrame: frame, zones: zones)
+
+        if let currentIndex = matchedIndex {
             let nextIndex = direction == .next
                 ? (currentIndex + 1) % zones.count
                 : (currentIndex - 1 + zones.count) % zones.count
             setFrame(zones[nextIndex].frame, on: window)
+            lastSnappedWindow = window
+            lastSnappedZoneIndex = nextIndex
             return
         }
 
@@ -53,6 +68,8 @@ enum WindowSnapper {
             return
         }
         setFrame(closest.frame, on: window)
+        lastSnappedWindow = window
+        lastSnappedZoneIndex = zones.firstIndex { $0.frame == closest.frame }
     }
 
     static func maximize() {
@@ -121,6 +138,34 @@ enum WindowSnapper {
         let dw = abs(lhs.width - rhs.width)
         let dh = abs(lhs.height - rhs.height)
         return dx < tolerance && dy < tolerance && dw < tolerance && dh < tolerance
+    }
+
+    /// Falls back to the zone this exact window was last snapped to when
+    /// its live frame no longer matches any zone within
+    /// `rectsApproximatelyEqual`'s tolerance. This is what lets Start+Arrow
+    /// cycling work on apps like Terminal.app: terminal emulators quantize
+    /// their window size to whole rows/columns, so the frame read back
+    /// after a snap is routinely 10+ points off the exact zone rect in
+    /// width/height — enough to fail the geometry match every time and make
+    /// every subsequent press look like "snap to nearest" instead of
+    /// advancing. Position (unlike size) is respected precisely by those
+    /// apps, so trusting the tracked zone only when the window's origin is
+    /// still close to it distinguishes "just quantized" from "the user
+    /// dragged this window somewhere else since the last snap," which
+    /// falls through to `closestZone` below like a fresh window would.
+    private static func trackedZoneIndex(for window: AXUIElement, currentFrame: CGRect, zones: [SnapZones.Zone]) -> Int? {
+        guard
+            let lastWindow = lastSnappedWindow, CFEqual(lastWindow, window),
+            let lastIndex = lastSnappedZoneIndex, zones.indices.contains(lastIndex)
+        else {
+            return nil
+        }
+
+        let zoneOrigin = zones[lastIndex].frame.origin
+        let positionTolerance: CGFloat = 20
+        return abs(zoneOrigin.x - currentFrame.origin.x) < positionTolerance
+            && abs(zoneOrigin.y - currentFrame.origin.y) < positionTolerance
+            ? lastIndex : nil
     }
 
     /// The zone whose center is nearest the window's current center — used
