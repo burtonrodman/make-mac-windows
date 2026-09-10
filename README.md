@@ -100,7 +100,7 @@ riding along), so it never touches Ctrl+Shift+C — Inspect Element in every
 major browser — or any other Ctrl-based shortcut. Toggle the whole feature
 on/off from the menu-bar icon, independent of the exclusion list.
 
-### VS Code: fully excluded — use the companion keymap extension instead
+### VS Code: fully excluded (with one exception) — use the companion keymap extension for the rest
 
 Apps that host more than one kind of view under one bundle ID — most
 notably VS Code, whose editor and integrated terminal are the same process
@@ -122,9 +122,23 @@ using VS Code's own `"when"` context clauses (`terminalFocus`,
 `editorTextFocus`) to distinguish the integrated terminal from the editor
 *exactly*, which is more complete and more reliable than anything PCMode
 could do from outside via Accessibility. See that extension's README for
-install steps and known OS-level caveats (a few Windows shortcuts collide
-with macOS's own Mission Control bindings and can't be fixed from within
-VS Code).
+install steps and known OS-level caveats.
+
+The one exception: **Control+Left/Right word navigation is a PCMode remap,
+not an extension keybinding, and it applies even in VS Code.** Every other
+Windows shortcut needs the extension's `when`-clause precision because it
+means something different in the editor than it does in the integrated
+terminal (Ctrl+C is copy vs. SIGINT, for instance) — but word-by-word
+navigation means the same thing in both (and a terminal's readline already
+treats the Mac's own word-nav shortcut, Option+Left/Right, as
+backward-word/forward-word), so there's no ambiguity to resolve. More
+importantly, plain Ctrl+Left/Right/Up/Down can't be fixed from *inside* VS
+Code at all — they're macOS Mission Control's own
+space-switching shortcuts, claimed at the OS level before any app,
+VS Code included, ever sees the keystroke. Only something sitting outside
+the app, ahead of that OS-level dispatch — which is exactly what PCMode's
+event tap is — can win that race. See
+`HotkeyEventTap.remapControlArrow`/`Preferences.controlArrowRemapEnabled`.
 
 ## Feature 4b: Start key + L locks the screen
 

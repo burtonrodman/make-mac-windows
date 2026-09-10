@@ -15,6 +15,15 @@ func _AXUIElementGetWindow(_ element: AXUIElement, _ outWindow: inout CGWindowID
 /// window out of an app that has several, which Cmd+Tab can't do.
 enum WindowActivator {
     static func activate(_ window: WindowInfo) {
+        // `pid == 0` marks a recently-used-but-now-quit app (see
+        // `WindowInfo.bundleIdentifier`/`WindowLister.recentlyQuitApps`) —
+        // there's no running process to activate a window within, so launch
+        // it fresh instead.
+        guard window.pid != 0 else {
+            launch(bundleIdentifier: window.bundleIdentifier)
+            return
+        }
+
         let appElement = AXUIElementCreateApplication(window.pid)
 
         // Bring the app itself frontmost first...
@@ -41,5 +50,13 @@ enum WindowActivator {
             AXUIElementSetAttributeValue(appElement, kAXFrontmostAttribute as CFString, kCFBooleanTrue)
             break
         }
+    }
+
+    private static func launch(bundleIdentifier: String?) {
+        guard
+            let bundleIdentifier,
+            let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier)
+        else { return }
+        NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
     }
 }

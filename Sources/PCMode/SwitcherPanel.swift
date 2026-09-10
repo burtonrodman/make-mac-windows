@@ -8,6 +8,13 @@ import Cocoa
 /// window's actual contents rather than just its app icon.
 final class SwitcherPanel: NSPanel {
     private static let panelCornerRadius: CGFloat = 28
+    /// Extra transparent margin around the visible (rounded) card, existing
+    /// solely to give `shadowHost`'s manual CALayer shadow (see below) room
+    /// to blur into — a CALayer's shadow is clipped to its own window's
+    /// frame, unlike `NSWindow`'s native shadow which can paint outside the
+    /// window's frame onto the desktop. Comfortably covers `shadowRadius`
+    /// (20) plus `shadowOffset`'s vertical push (10) on every side.
+    private static let shadowMargin: CGFloat = 44
 
     /// A single cell's clickable surface — reports its flat index back to
     /// the panel on mouse-down so clicking a window (rather than only
@@ -43,6 +50,7 @@ final class SwitcherPanel: NSPanel {
         let outerStackSpacing: CGFloat
         let cellCaptionFontSize: CGFloat
         let machineLabelFontSize: CGFloat
+        let recentAppsLabelFontSize: CGFloat
 
         init(scale: CGFloat) {
             previewWidth = 420 * scale
@@ -65,16 +73,26 @@ final class SwitcherPanel: NSPanel {
             // one piece of chrome answering "which physical Mac is this,"
             // so it should read at a glance, not as a footnote.
             machineLabelFontSize = max(18, 24 * scale)
+            // A quieter section-header size — sits between the per-cell
+            // captions and the machine label rather than competing with
+            // either.
+            recentAppsLabelFontSize = max(12, 15 * scale)
         }
 
         /// Estimated non-grid chrome height (outer insets and — while a
         /// Screen Sharing session is active, see `machineLabel` — the
-        /// machine-name label above the grid plus its own spacing) — used to
-        /// cap the grid's visible height to what actually fits the screen.
-        func chromeHeight(showingMachineLabel: Bool) -> CGFloat {
+        /// machine-name label above the grid plus its own spacing, and —
+        /// when the switcher has no real windows to offer, see
+        /// `recentAppsLabel` — the "Recent Apps" header plus its own
+        /// spacing) — used to cap the grid's visible height to what actually
+        /// fits the screen.
+        func chromeHeight(showingMachineLabel: Bool, showingRecentAppsLabel: Bool) -> CGFloat {
             var height = outerTopInset + outerBottomInset
             if showingMachineLabel {
                 height += machineLabelFontSize + 8 + outerStackSpacing
+            }
+            if showingRecentAppsLabel {
+                height += recentAppsLabelFontSize + 8 + outerStackSpacing
             }
             return height
         }
@@ -98,6 +116,14 @@ final class SwitcherPanel: NSPanel {
     /// per `NSStackView`'s default behavior, taking up no space or spacing)
     /// the rest of the time.
     private let machineLabel = NSTextField(labelWithString: "")
+    /// Headers the grid with "Recent Apps" whenever every entry currently
+    /// showing is one of `WindowLister`'s windowless-app fallbacks (icon
+    /// only, no real window — see `WindowInfo.previewImage`) rather than an
+    /// actual window to switch to, so it's clear why the tiles look like a
+    /// plain app list instead of the usual live thumbnails. Hidden (and
+    /// takes up no space, per `NSStackView`'s default behavior) the rest of
+    /// the time.
+    private let recentAppsLabel = NSTextField(labelWithString: "")
     /// A translucent wash of the user's System Settings > Appearance >
     /// Accent Color, sitting between the vibrancy blur and everything else —
     /// mirrors how Windows tints its own Alt-Tab UI with the system accent
@@ -105,6 +131,21 @@ final class SwitcherPanel: NSPanel {
     /// bar uses. See `updateAccentTint`.
     private let tintView = NSView()
     private let outerStack = NSStackView()
+    /// The window's actual root content view — hosts `shadowHost` and
+    /// `visualEffect` side by side (not nested) so `visualEffect`'s own
+    /// `masksToBounds` (needed to clip its blur/tint to rounded corners)
+    /// can't also clip away `shadowHost`'s shadow. See `shadowMargin`.
+    private let rootView = NSView()
+    /// A plain, unmasked layer-backed view the same size and rounded shape
+    /// as `visualEffect`, sitting directly behind it — exists purely to
+    /// cast a `CALayer` shadow that actually conforms to the panel's rounded
+    /// corners. `NSWindow`'s own automatic shadow (`hasShadow`) infers its
+    /// shape from the window's rendered content, but with
+    /// `NSVisualEffectView`'s `.behindWindow` blending mode that inference
+    /// falls back to the view's plain rectangular frame — the fabled "square
+    /// blur around a rounded panel." A manual `shadowPath` sidesteps that
+    /// entirely. See `updateShadowPath`.
+    private let shadowHost = NSView()
     private var cellViews: [NSView] = []
     private var windows: [WindowInfo] = []
     private var layout = Layout(scale: 1.0)
@@ -135,7 +176,9 @@ final class SwitcherPanel: NSPanel {
         collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
         isOpaque = false
         backgroundColor = .clear
-        hasShadow = true
+        // The native window shadow is disabled in favor of `shadowHost`'s
+        // manual, rounded-corner-aware one — see its doc comment.
+        hasShadow = false
         hidesOnDeactivate = false
         // Clickable (see `CellView`/`onWindowClicked`) — unlike macOS's own
         // Cmd+Tab bar, but matching Windows' Alt-Tab, where clicking a
@@ -160,6 +203,17 @@ final class SwitcherPanel: NSPanel {
         // plain circular-arc corner.
         visualEffect.layer?.cornerCurve = .continuous
         visualEffect.layer?.masksToBounds = true
+        visualEffect.translatesAutoresizingMaskIntoConstraints = false
+
+        shadowHost.wantsLayer = true
+        shadowHost.layer?.backgroundColor = NSColor.clear.cgColor
+        shadowHost.layer?.shadowColor = NSColor.black.cgColor
+        shadowHost.layer?.shadowOpacity = 0.5
+        shadowHost.layer?.shadowRadius = 20
+        shadowHost.layer?.shadowOffset = CGSize(width: 0, height: -10)
+        shadowHost.translatesAutoresizingMaskIntoConstraints = false
+
+        rootView.wantsLayer = true
 
         tintView.wantsLayer = true
         tintView.layer?.cornerRadius = Self.panelCornerRadius
@@ -191,7 +245,17 @@ final class SwitcherPanel: NSPanel {
         machineLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         machineLabel.isHidden = true
 
+        recentAppsLabel.stringValue = "Recent Apps"
+        recentAppsLabel.font = .systemFont(ofSize: layout.recentAppsLabelFontSize, weight: .semibold)
+        recentAppsLabel.alignment = .center
+        recentAppsLabel.lineBreakMode = .byTruncatingTail
+        recentAppsLabel.textColor = .secondaryLabelColor
+        recentAppsLabel.translatesAutoresizingMaskIntoConstraints = false
+        recentAppsLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        recentAppsLabel.isHidden = true
+
         outerStack.addArrangedSubview(machineLabel)
+        outerStack.addArrangedSubview(recentAppsLabel)
         outerStack.addArrangedSubview(scrollView)
         outerStack.orientation = .vertical
         outerStack.alignment = .centerX
@@ -206,11 +270,25 @@ final class SwitcherPanel: NSPanel {
         // first so it paints under `outerStack`, not over it.
         visualEffect.addSubview(tintView)
         visualEffect.addSubview(outerStack)
+        // `shadowHost` goes in first so it paints behind `visualEffect`, not
+        // over it — see their doc comments. Both are inset from `rootView`
+        // by `shadowMargin` and pinned to each other so they always share
+        // the exact same rounded rect.
+        rootView.addSubview(shadowHost)
+        rootView.addSubview(visualEffect)
         let scrollViewWidthConstraint = scrollView.widthAnchor.constraint(equalToConstant: 0)
         let scrollViewHeightConstraint = scrollView.heightAnchor.constraint(equalToConstant: 0)
         self.scrollViewWidthConstraint = scrollViewWidthConstraint
         self.scrollViewHeightConstraint = scrollViewHeightConstraint
         NSLayoutConstraint.activate([
+            shadowHost.topAnchor.constraint(equalTo: rootView.topAnchor, constant: Self.shadowMargin),
+            shadowHost.bottomAnchor.constraint(equalTo: rootView.bottomAnchor, constant: -Self.shadowMargin),
+            shadowHost.leadingAnchor.constraint(equalTo: rootView.leadingAnchor, constant: Self.shadowMargin),
+            shadowHost.trailingAnchor.constraint(equalTo: rootView.trailingAnchor, constant: -Self.shadowMargin),
+            visualEffect.topAnchor.constraint(equalTo: shadowHost.topAnchor),
+            visualEffect.bottomAnchor.constraint(equalTo: shadowHost.bottomAnchor),
+            visualEffect.leadingAnchor.constraint(equalTo: shadowHost.leadingAnchor),
+            visualEffect.trailingAnchor.constraint(equalTo: shadowHost.trailingAnchor),
             tintView.topAnchor.constraint(equalTo: visualEffect.topAnchor),
             tintView.bottomAnchor.constraint(equalTo: visualEffect.bottomAnchor),
             tintView.leadingAnchor.constraint(equalTo: visualEffect.leadingAnchor),
@@ -223,11 +301,12 @@ final class SwitcherPanel: NSPanel {
             // just the icon grid's) so a long machine name truncates instead
             // of forcing the panel wider or running edge-to-edge.
             machineLabel.widthAnchor.constraint(lessThanOrEqualTo: visualEffect.widthAnchor, multiplier: 0.8),
+            recentAppsLabel.widthAnchor.constraint(lessThanOrEqualTo: visualEffect.widthAnchor, multiplier: 0.8),
             scrollViewWidthConstraint,
             scrollViewHeightConstraint,
         ])
 
-        contentView = visualEffect
+        contentView = rootView
         updateAccentTint()
     }
 
@@ -239,6 +318,7 @@ final class SwitcherPanel: NSPanel {
         // under) since the switcher last showed.
         updateAccentTint()
         updateMachineLabel(machineName)
+        updateRecentAppsLabel(windows: windows)
         rebuild(windows: windows, screen: screen)
         updateSelection(selectedIndex)
         centerOnActiveScreen(screen)
@@ -267,6 +347,17 @@ final class SwitcherPanel: NSPanel {
             machineLabel.stringValue = ""
             machineLabel.isHidden = true
         }
+    }
+
+    /// Shows the "Recent Apps" header whenever `windows` has no real window
+    /// to offer at all — every entry is one of `WindowLister`'s
+    /// windowless-app fallbacks (`windowID == 0`). A mix of real windows and
+    /// fallback entries (the common case — one app happens to have no open
+    /// window while others do) doesn't count; the header is only about the
+    /// all-fallback case where the grid is really just a recent-apps list.
+    private func updateRecentAppsLabel(windows: [WindowInfo]) {
+        let isAllRecentApps = !windows.isEmpty && windows.allSatisfy { $0.windowID == 0 }
+        recentAppsLabel.isHidden = !isAllRecentApps
     }
 
     func hide() {
@@ -332,6 +423,7 @@ final class SwitcherPanel: NSPanel {
             bottom: layout.outerBottomInset, right: layout.outerHorizontalInset
         )
         machineLabel.font = .systemFont(ofSize: layout.machineLabelFontSize, weight: .bold)
+        recentAppsLabel.font = .systemFont(ofSize: layout.recentAppsLabelFontSize, weight: .semibold)
 
         grid.arrangedSubviews.forEach {
             grid.removeArrangedSubview($0)
@@ -367,20 +459,45 @@ final class SwitcherPanel: NSPanel {
         // active screen, so a lot of wrapped rows scrolls instead of running
         // the panel off the top/bottom.
         let showingMachineLabel = !machineLabel.isHidden
-        let chromeHeight = layout.chromeHeight(showingMachineLabel: showingMachineLabel)
+        let showingRecentAppsLabel = !recentAppsLabel.isHidden
+        let chromeHeight = layout.chromeHeight(
+            showingMachineLabel: showingMachineLabel,
+            showingRecentAppsLabel: showingRecentAppsLabel
+        )
         let screenHeight = screen?.visibleFrame.height ?? 800
-        let maxGridHeight = max(layout.previewHeight, screenHeight * 0.9 - chromeHeight)
+        let maxGridHeight = max(layout.previewHeight, screenHeight * 0.9 - chromeHeight - Self.shadowMargin * 2)
         let visibleGridHeight = min(gridSize.height, maxGridHeight)
 
         scrollViewWidthConstraint?.constant = gridSize.width
         scrollViewHeightConstraint?.constant = visibleGridHeight
 
         var newFrame = frame
+        // The visible (rounded) card's size, plus `shadowMargin` on every
+        // side for `shadowHost`'s shadow to blur into — see its doc comment.
         newFrame.size = NSSize(
-            width: max(280, gridSize.width + layout.outerHorizontalInset * 2),
-            height: max(180, visibleGridHeight + chromeHeight)
+            width: max(280, gridSize.width + layout.outerHorizontalInset * 2) + Self.shadowMargin * 2,
+            height: max(180, visibleGridHeight + chromeHeight) + Self.shadowMargin * 2
         )
-        setFrame(newFrame, display: false)
+        // `display: true` so the layout below sees the panel's final size
+        // immediately rather than on some later run-loop pass.
+        setFrame(newFrame, display: true)
+        rootView.layoutSubtreeIfNeeded()
+        updateShadowPath()
+    }
+
+    /// Recomputes `shadowHost`'s shadow shape to match its current
+    /// (rounded, `panelCornerRadius`) bounds. A `CALayer`'s `shadowPath`
+    /// doesn't auto-track bounds changes the way its other shadow
+    /// properties do, so this needs to be re-run by hand whenever the panel
+    /// resizes — e.g. a different number of windows/apps between one show
+    /// and the next.
+    private func updateShadowPath() {
+        shadowHost.layer?.shadowPath = CGPath(
+            roundedRect: shadowHost.bounds,
+            cornerWidth: Self.panelCornerRadius,
+            cornerHeight: Self.panelCornerRadius,
+            transform: nil
+        )
     }
 
     /// Chunks the window list into rows sized to fit within the active

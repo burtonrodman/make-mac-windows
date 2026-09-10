@@ -149,8 +149,9 @@ final class SettingsWindowController: NSWindowController {
 
         let explanation = NSTextField(wrappingLabelWithString:
             "What each physical modifier key does for the shortcuts PCMode handles below " +
-                "— tap-for-Spotlight, the window switcher, window snap, Control+A/C/S/V, and " +
-                "Home/End navigation. This never changes what a key sends to other apps; " +
+                "— tap-for-Spotlight, the window switcher, window snap, Control+A/C/S/V, " +
+                "Home/End navigation, and Control+Left/Right word navigation. This never " +
+                "changes what a key sends to other apps; " +
                 "it only changes which key(s) PCMode itself reacts to.")
         explanation.font = .systemFont(ofSize: 11)
         explanation.textColor = .secondaryLabelColor

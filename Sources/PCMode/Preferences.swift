@@ -48,6 +48,7 @@ final class Preferences {
     private let ctrlCVRemapKey = "ctrlCVRemapEnabled"
     private let ctrlCVDenylistKey = "ctrlCVDenylistBundleIDs"
     private let homeEndRemapKey = "homeEndRemapEnabled"
+    private let controlArrowRemapKey = "controlArrowRemapEnabled"
     private let closeWindowShortcutKey = "closeWindowShortcutEnabled"
     private let lockScreenShortcutKey = "lockScreenShortcutEnabled"
     private let perAppKeyRemapKey = "perAppKeyRemapEnabled"
@@ -93,6 +94,14 @@ final class Preferences {
     /// integrated terminal from the editor exactly, which is more complete
     /// and more reliable than anything PCMode could do from outside via
     /// Accessibility.
+    ///
+    /// One deliberate exception: `HotkeyEventTap.remapControlArrow`
+    /// (Control+Left/Right → Option+Left/Right) checks
+    /// `controlArrowRemapEnabled` directly and never consults this list, so
+    /// it still fires in VS Code — see that property's doc for why word
+    /// navigation doesn't have the editor-vs-terminal ambiguity every other
+    /// remap here does, and why it's the one shortcut the companion
+    /// extension can't fix from inside the app at all.
     static let fullyExcludedBundleIDs = [
         "com.microsoft.VSCode",
     ]
@@ -194,6 +203,25 @@ final class Preferences {
     var homeEndRemapEnabled: Bool {
         get { defaults.object(forKey: homeEndRemapKey) as? Bool ?? true }
         set { defaults.set(newValue, forKey: homeEndRemapKey) }
+    }
+
+    /// Control+Left/Right remapped to Option+Left/Right (word navigation) —
+    /// mirroring Windows, where Ctrl+Left/Right is the word-nav convention
+    /// that's Option+Left/Right on the Mac. Defaults on, like the other
+    /// shortcuts. See `HotkeyEventTap.remapControlArrow` — unlike every other
+    /// remap in this file, this one deliberately applies even to apps on
+    /// `Preferences.fullyExcludedBundleIDs` (VS Code): word-by-word
+    /// navigation means the same thing in an editor as it does in a
+    /// terminal's readline (which already treats Option+Left/Right this way
+    /// too), so there's no editor-vs-terminal ambiguity to get wrong the way
+    /// there is for Control+A/C/S/V/X. It's also the one Windows shortcut VS
+    /// Code's companion keymap extension can't fix from inside the app at
+    /// all: Ctrl+Left/Right collide with macOS Mission Control's own
+    /// space-switching shortcuts, claimed at the OS level before any app
+    /// sees the keystroke — only an outside event tap can win that race.
+    var controlArrowRemapEnabled: Bool {
+        get { defaults.object(forKey: controlArrowRemapKey) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: controlArrowRemapKey) }
     }
 
     /// Command+F4 closes the focused window, mirroring Windows' Alt+F4 (bound

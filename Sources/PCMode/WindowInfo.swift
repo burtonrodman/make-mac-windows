@@ -6,10 +6,18 @@ import Cocoa
 /// grouping (Cmd+Tab).
 struct WindowInfo {
     let windowID: CGWindowID
+    /// `0` is a sentinel for a recently-used app that has since quit — see
+    /// `WindowLister.recentlyQuitApps` — since no real process backs it
+    /// anymore. Every other entry (including the windowless-but-running
+    /// fallback, which keeps its real pid) has a genuine pid.
     let pid: pid_t
     let ownerName: String
     let title: String
     let bounds: CGRect
+    /// Set only for the `pid == 0` recently-quit-app fallback, so `icon` and
+    /// `WindowActivator` can still look the app up (by bundle ID, since
+    /// there's no running process) instead of just a specific window.
+    var bundleIdentifier: String? = nil
 
     /// Falls back to the owning app's name when the window has no title
     /// (common for single-window utility apps).
@@ -18,8 +26,14 @@ struct WindowInfo {
     }
 
     var icon: NSImage {
-        NSRunningApplication(processIdentifier: pid)?.icon
-            ?? NSWorkspace.shared.icon(for: .application)
+        if pid != 0, let icon = NSRunningApplication(processIdentifier: pid)?.icon {
+            return icon
+        }
+        if let bundleIdentifier,
+            let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) {
+            return NSWorkspace.shared.icon(forFile: url.path)
+        }
+        return NSWorkspace.shared.icon(for: .application)
     }
 
     /// A live-at-this-moment snapshot of the window's on-screen contents, for
@@ -170,7 +184,45 @@ enum WindowLister {
                 )
             }
 
-        return windows + minimized + windowlessApps
+        let liveEntries = windows + minimized + windowlessApps
+
+        // With two or more live entries there's already something real to
+        // switch between, so leave the list as-is. Otherwise (every app
+        // quit, or only one left) fall back to recently-used apps that have
+        // since closed, so the switcher still has something to offer
+        // instead of not appearing at all.
+        guard liveEntries.count <= 1 else { return liveEntries }
+
+        let liveBundleIDs = bundleIDsWithWindows.union(
+            windowlessApps.compactMap { NSRunningApplication(processIdentifier: $0.pid)?.bundleIdentifier }
+        )
+        let recentlyQuit = recentlyQuitApps(excludingBundleIDs: liveBundleIDs)
+
+        return liveEntries + recentlyQuit
+    }
+
+    /// Recently-used apps (see `RecentAppHistory`) that aren't currently
+    /// running at all — icon-only fallback entries (`windowID`/`pid == 0`,
+    /// see `WindowInfo.bundleIdentifier`) so `WindowActivator` knows to
+    /// launch them fresh rather than activate an existing process.
+    private static func recentlyQuitApps(excludingBundleIDs: Set<String>) -> [WindowInfo] {
+        let ownBundleID = Bundle.main.bundleIdentifier
+        return RecentAppHistory.recentBundleIdentifiers()
+            .filter { $0 != ownBundleID && !excludingBundleIDs.contains($0) }
+            .compactMap { bundleID -> WindowInfo? in
+                guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
+                    return nil
+                }
+                let name = FileManager.default.displayName(atPath: url.path)
+                return WindowInfo(
+                    windowID: 0,
+                    pid: 0,
+                    ownerName: name,
+                    title: "",
+                    bounds: .zero,
+                    bundleIdentifier: bundleID
+                )
+            }
     }
 
     /// Minimized windows across all apps, found via the Accessibility API

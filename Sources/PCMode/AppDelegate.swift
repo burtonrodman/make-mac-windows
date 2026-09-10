@@ -33,6 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             LockScreenLocker.lock()
         }
         SwitcherController.shared.start()
+        RecentAppHistory.start()
         startPermissionPollingIfNeeded()
     }
 

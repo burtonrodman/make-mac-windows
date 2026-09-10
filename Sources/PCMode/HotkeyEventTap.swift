@@ -249,6 +249,12 @@ final class HotkeyEventTap {
                 return Unmanaged.passUnretained(event)
             }
 
+            if remapControlArrow(keyCode: keyCode, flags: flags, event: event) {
+                // Mutated in place to Option+Arrow above — pass the same
+                // event through rather than swallowing it.
+                return Unmanaged.passUnretained(event)
+            }
+
             if remapPerAppShortcut(keyCode: keyCode, flags: flags, event: event) {
                 // Mutated in place to the target keystroke above — pass the
                 // same event through rather than swallowing it.
@@ -536,6 +542,50 @@ final class HotkeyEventTap {
         var newFlags = flags
         for slot in controlSlots { newFlags.subtract(slot.flagBits) }
         event.flags = newFlags.union(.maskCommand)
+        return true
+    }
+
+    /// Control+Left/Right remapped to Option+Left/Right in place — mirroring
+    /// Windows' word-navigation convention (the Mac's own is
+    /// Option+Left/Right). Shift rides along unchanged so
+    /// Control+Shift+Left/Right still extends the selection by word.
+    /// "Control" here means whichever physical key(s) are currently assigned
+    /// the `.control` role (see `ModifierKeys.swift`), not necessarily
+    /// literal Control. Requires *bare* Control aside from Shift — no
+    /// Option/Command riding along — so it never touches e.g.
+    /// Control+Command+Left/Right.
+    ///
+    /// Unlike every other remap in this file, this one is **not** skipped
+    /// for `Preferences.fullyExcludedBundleIDs` (VS Code) — deliberately.
+    /// Word-by-word navigation means the same thing in a text editor as it
+    /// does in a terminal's readline (which already treats Option+Left/Right
+    /// as backward-word/forward-word), so there's no editor-vs-terminal
+    /// ambiguity to get wrong the way there is for Control+A/C/S/V/X. It's
+    /// also the one Windows shortcut VS Code's companion keymap extension
+    /// (`vscode-windows-keymap/`) admits it can't fix from inside the app at
+    /// all: Control+Left/Right/Up/Down are macOS Mission Control's own
+    /// space-switching shortcuts, claimed at the OS level before any app —
+    /// VS Code included — ever sees the keystroke. Only an outside event tap
+    /// like this one, sitting ahead of that OS-level dispatch, can win that
+    /// race. Returns whether the event was remapped.
+    private func remapControlArrow(keyCode: Int, flags: CGEventFlags, event: CGEvent) -> Bool {
+        guard Preferences.shared.controlArrowRemapEnabled else { return false }
+        guard keyCode == kVK_LeftArrow || keyCode == kVK_RightArrow else { return false }
+
+        let controlSlots = Preferences.shared.slotsHeld(inBucket: .control, flags: flags)
+        guard !controlSlots.isEmpty else { return false }
+
+        var remaining = flags
+        for slot in controlSlots { remaining.subtract(slot.flagBits) }
+        guard
+            !remaining.contains(.maskControl),
+            !remaining.contains(.maskCommand),
+            !remaining.contains(.maskAlternate)
+        else {
+            return false
+        }
+
+        event.flags = remaining.union(.maskAlternate)
         return true
     }
 

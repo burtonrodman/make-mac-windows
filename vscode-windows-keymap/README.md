@@ -57,11 +57,21 @@ A handful of Windows shortcuts collide with macOS shortcuts that live
 *outside* VS Code, at the OS level — no app, including this one, can
 override these from a keybindings contribution:
 
-- **Ctrl+Up / Ctrl+Down / Ctrl+Left / Ctrl+Right** are Mission
-  Control/Spaces shortcuts by default on macOS. The scroll-line and
-  terminal-scroll bindings that use them will silently do nothing until
-  you turn those off in System Settings → Keyboard → Keyboard Shortcuts →
-  Mission Control (or accept that macOS wins).
+- **Ctrl+Up / Ctrl+Down** are Mission Control/Spaces shortcuts by default
+  on macOS. The scroll-line bindings that use them will silently do
+  nothing until you turn those off in System Settings → Keyboard →
+  Keyboard Shortcuts → Mission Control (or accept that macOS wins). **This
+  extension can't fix that from inside VS Code** — no keybindings
+  contribution can out-race an OS-level hotkey.
+- **Ctrl+Left / Ctrl+Right** are the same Mission Control/Spaces
+  collision, but PCMode itself solves this one from outside the app: it
+  remaps Ctrl+Left/Right to Option+Left/Right (word navigation) in its own
+  event tap, ahead of Mission Control's own dispatch — the one PCMode
+  keyboard remap that still applies in VS Code despite it otherwise being
+  fully excluded (see the main repo's README). Only relevant if you're
+  running this extension without PCMode (e.g. on someone else's Mac): in
+  that case Ctrl+Left/Right will silently do nothing, same as Ctrl+Up/Down
+  above, until Mission Control's shortcuts are turned off.
 - **F11** (Toggle Full Screen) may be claimed by Mission Control's "Show
   Desktop" binding, or by media-key/Fn behavior on laptop keyboards.
 

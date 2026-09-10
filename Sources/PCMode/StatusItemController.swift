@@ -7,7 +7,8 @@ import Cocoa
 /// per-app key mappings, and the Option+Arrow snap/cycle toggle plus its
 /// per-monitor zone editor — the switcher's trigger, the
 /// tap-to-open-Spotlight toggles, the Control+A/C/S/V remap toggle, the
-/// Home/End line/document-navigation remap toggle, the Command+F4
+/// Home/End line/document-navigation remap toggle, the Control+Left/Right
+/// word-navigation remap toggle, the Command+F4
 /// close-window toggle, the Control+F4-closes-tab toggle, the Start
 /// Key+L-locks-the-screen toggle, the (off by default) Control+Click
 /// multi-select toggle, the (off by default, experimental)
@@ -23,6 +24,7 @@ final class StatusItemController {
     private let commandSpotlightToggleItem = NSMenuItem()
     private let ctrlCVRemapToggleItem = NSMenuItem()
     private let homeEndRemapToggleItem = NSMenuItem()
+    private let controlArrowRemapToggleItem = NSMenuItem()
     private let closeWindowToggleItem = NSMenuItem()
     private let ctrlF4ToggleItem = NSMenuItem()
     private let lockScreenToggleItem = NSMenuItem()
@@ -103,6 +105,11 @@ final class StatusItemController {
         homeEndRemapToggleItem.action = #selector(toggleHomeEndRemap)
         homeEndRemapToggleItem.target = self
         menu.addItem(homeEndRemapToggleItem)
+
+        controlArrowRemapToggleItem.title = "Control+Left/Right → Option+Left/Right (Word Navigation, Works Even in VS Code)"
+        controlArrowRemapToggleItem.action = #selector(toggleControlArrowRemap)
+        controlArrowRemapToggleItem.target = self
+        menu.addItem(controlArrowRemapToggleItem)
 
         menu.addItem(.separator())
 
@@ -199,6 +206,11 @@ final class StatusItemController {
         updateCheckmarks()
     }
 
+    @objc private func toggleControlArrowRemap() {
+        Preferences.shared.controlArrowRemapEnabled.toggle()
+        updateCheckmarks()
+    }
+
     @objc private func toggleCloseWindowShortcut() {
         Preferences.shared.closeWindowShortcutEnabled.toggle()
         updateCheckmarks()
@@ -238,6 +250,7 @@ final class StatusItemController {
         commandSpotlightToggleItem.state = Preferences.shared.commandTapOpensSpotlight ? .on : .off
         ctrlCVRemapToggleItem.state = Preferences.shared.ctrlCVRemapEnabled ? .on : .off
         homeEndRemapToggleItem.state = Preferences.shared.homeEndRemapEnabled ? .on : .off
+        controlArrowRemapToggleItem.state = Preferences.shared.controlArrowRemapEnabled ? .on : .off
         closeWindowToggleItem.state = Preferences.shared.closeWindowShortcutEnabled ? .on : .off
         ctrlF4ToggleItem.state = Preferences.shared.ctrlF4ClosesTabEnabled ? .on : .off
         lockScreenToggleItem.state = Preferences.shared.lockScreenShortcutEnabled ? .on : .off
