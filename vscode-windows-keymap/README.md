@@ -39,12 +39,19 @@ binding — same tradeoff Windows itself makes.
 
 ## Install
 
-**From a local build (no Marketplace publishing needed):**
+**From the Marketplace (recommended, auto-updates):** Extensions view →
+search "Windows Keymap (PCMode)" → Install, or:
+
+```sh
+code --install-extension burtonrodman.windows-keymap
+```
+
+**From a local build:**
 
 ```sh
 cd vscode-windows-keymap
 npx @vscode/vsce package
-code --install-extension windows-keymap-0.1.0.vsix
+code --install-extension windows-keymap-*.vsix
 ```
 
 Reload VS Code (Cmd+Shift+P → "Developer: Reload Window") afterward.

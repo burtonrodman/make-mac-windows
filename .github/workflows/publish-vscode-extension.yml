@@ -1,0 +1,56 @@
+name: Publish VS Code extension
+
+# Publishes vscode-windows-keymap to the VS Code Marketplace when a GitHub
+# release tagged vscode/vX.Y.Z is published. The version comes from the tag
+# and is written into package.json only inside this run; nothing is pushed
+# back to the repo. The packaged .vsix is attached to the release.
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    working-directory: vscode-windows-keymap
+
+jobs:
+  publish:
+    if: startsWith(github.event.release.tag_name, 'vscode/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Set version from tag
+        id: version
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          version="${TAG#vscode/v}"
+          # The Marketplace only accepts plain major.minor.patch versions.
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Tag '$TAG' must look like vscode/v1.2.3"
+            exit 1
+          fi
+          npm version "$version" --no-git-tag-version --allow-same-version
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Package
+        run: npx --yes @vscode/vsce package -o "windows-keymap-${{ steps.version.outputs.version }}.vsix"
+
+      - name: Publish to VS Code Marketplace
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: npx --yes @vscode/vsce publish --packagePath "windows-keymap-${{ steps.version.outputs.version }}.vsix"
+
+      - name: Attach .vsix to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$TAG" "windows-keymap-${{ steps.version.outputs.version }}.vsix" --clobber
