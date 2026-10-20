@@ -199,13 +199,14 @@ enum PerAppKeyRemaps {
             toModifiers: [.command, .option]
         ),
 
-        // F5 (refresh on Windows) → Cmd+F5. Bare F5 — no modifier
-        // requirements.
+        // F5 (refresh on Windows) → Cmd+R (Chrome's own Mac shortcut for
+        // Reload). Bare F5 — no modifier requirements. (Not Cmd+F5: that's
+        // the system-wide VoiceOver toggle.)
         PerAppKeyRemap(
             bundleID: "com.google.Chrome",
             fromKeyCode: kVK_F5,
             fromModifiers: [],
-            toKeyCode: kVK_F5,
+            toKeyCode: kVK_ANSI_R,
             toModifiers: [.command]
         ),
 

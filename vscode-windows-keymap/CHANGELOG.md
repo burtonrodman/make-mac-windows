@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.3
+
+Fixed: F2 didn't rename the selected file or folder in the Explorer — on
+macOS VS Code binds `renameFile` only to Enter, and F2 there is just the
+editor's Rename Symbol. Added `f2` → `renameFile` under the same `when`
+clause VS Code's Windows keymap uses (`filesExplorerFocus &&
+foldersViewVisible && !explorerResourceIsRoot && !explorerResourceReadonly
+&& !inputFocus`), so F2 in the editor still renames symbols.
+
 ## 0.1.2
 
 Fixed: plain Home/End (and Shift+Home/Shift+End) did nothing — only the

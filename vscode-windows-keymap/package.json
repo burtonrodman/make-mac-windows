@@ -2,7 +2,7 @@
   "name": "windows-keymap",
   "displayName": "Windows Keymap (PCMode)",
   "description": "Windows-style keyboard shortcuts for VS Code on macOS \u2014 the companion extension to PCMode.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publisher": "burtonrodman",
   "license": "MIT",
   "engines": {
@@ -468,6 +468,11 @@
       {
         "key": "ctrl+shift+e",
         "command": "workbench.view.explorer"
+      },
+      {
+        "key": "f2",
+        "command": "renameFile",
+        "when": "filesExplorerFocus && foldersViewVisible && !explorerResourceIsRoot && !explorerResourceReadonly && !inputFocus"
       },
       {
         "key": "ctrl+shift+f",
