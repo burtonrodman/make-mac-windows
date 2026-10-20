@@ -112,6 +112,9 @@ final class Preferences {
     /// navigation doesn't have the editor-vs-terminal ambiguity every other
     /// remap here does, and why it's the one shortcut the companion
     /// extension can't fix from inside the app at all.
+    /// `HotkeyEventTap.remapHomeEnd` is a partial exception too: plain
+    /// Home/End still becomes Command+Left/Right here (webview inputs need
+    /// it), while Control+Home/End is left for the extension.
     static let fullyExcludedBundleIDs = [
         "com.microsoft.VSCode",
     ]

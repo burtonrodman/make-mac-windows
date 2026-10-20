@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.4
+
+Fixed: Home/End still did nothing in webview-hosted inputs such as the
+Claude Code chat box — 0.1.2's `cursorHome`/`cursorEnd` bindings only drive
+VS Code's own editors, and inside a webview macOS treats raw Home/End as
+scroll-to-top/bottom without moving the caret. PCMode now remaps plain
+Home/End (and Shift+Home/End) to Cmd+Left/Right in VS Code too, which is
+line start/end everywhere. To keep the integrated terminal receiving real
+Home/End instead of VS Code's default Cmd+Left/Right → Ctrl+A/Ctrl+E, this
+release binds `cmd+left`/`cmd+right` under `terminalFocus` to send the
+`ESC [ H` / `ESC [ F` sequences.
+
 ## 0.1.3
 
 Fixed: F2 didn't rename the selected file or folder in the Explorer — on

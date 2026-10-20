@@ -2,7 +2,7 @@
   "name": "windows-keymap",
   "displayName": "Windows Keymap (PCMode)",
   "description": "Windows-style keyboard shortcuts for VS Code on macOS \u2014 the companion extension to PCMode.",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "publisher": "burtonrodman",
   "license": "MIT",
   "engines": {
@@ -544,6 +544,22 @@
       {
         "key": "shift+pagedown",
         "command": "workbench.action.terminal.scrollDownPage",
+        "when": "terminalFocus"
+      },
+      {
+        "key": "cmd+left",
+        "command": "workbench.action.terminal.sendSequence",
+        "args": {
+          "text": "\u001b[H"
+        },
+        "when": "terminalFocus"
+      },
+      {
+        "key": "cmd+right",
+        "command": "workbench.action.terminal.sendSequence",
+        "args": {
+          "text": "\u001b[F"
+        },
         "when": "terminalFocus"
       },
       {

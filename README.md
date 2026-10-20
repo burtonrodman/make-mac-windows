@@ -107,7 +107,7 @@ notably VS Code, whose editor and integrated terminal are the same process
 — can't be split by a simple app-level exclusion list, since the event tap
 only knows which *app* is frontmost, not which view inside it has focus.
 Rather than pick one side of that tradeoff, VS Code is fully excluded from
-every PCMode keystroke remap (Control+A/C/S/V/X, Home/End, and
+every PCMode keystroke remap (Control+A/C/S/V/X, Control+Home/End, and
 Control+F4-closes-tab; the window switcher, tap-for-Spotlight, and snap
 shortcuts are unaffected, since none of those collide with anything VS Code
 itself binds) — see `Preferences.fullyExcludedBundleIDs`.
@@ -139,6 +139,15 @@ VS Code included, ever sees the keystroke. Only something sitting outside
 the app, ahead of that OS-level dispatch — which is exactly what PCMode's
 event tap is — can win that race. See
 `HotkeyEventTap.remapControlArrow`/`Preferences.controlArrowRemapEnabled`.
+
+Plain Home/End (and Shift+Home/End) is a second, partial exception: PCMode
+still remaps it to Command+Left/Right in VS Code. Its webview-hosted inputs
+(the Claude Code chat box, for one) are Chromium text fields where macOS
+treats the raw Home/End keys as scroll-only, and no extension keybinding
+can reach inside a webview. Command+Left/Right is line start/end everywhere
+in VS Code, and the companion extension turns it back into real Home/End
+sequences in the integrated terminal. Control+Home/End stays with the
+extension. See `HotkeyEventTap.remapHomeEnd`.
 
 ## Feature 4b: Start key + L locks the screen
 
