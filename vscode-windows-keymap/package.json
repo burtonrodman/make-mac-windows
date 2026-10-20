@@ -2,7 +2,7 @@
   "name": "windows-keymap",
   "displayName": "Windows Keymap (PCMode)",
   "description": "Windows-style keyboard shortcuts for VS Code on macOS \u2014 the companion extension to PCMode.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "burtonrodman",
   "license": "MIT",
   "engines": {
@@ -102,6 +102,26 @@
         "key": "ctrl+[",
         "command": "editor.action.outdentLines",
         "when": "editorTextFocus"
+      },
+      {
+        "key": "home",
+        "command": "cursorHome",
+        "when": "textInputFocus"
+      },
+      {
+        "key": "shift+home",
+        "command": "cursorHomeSelect",
+        "when": "textInputFocus"
+      },
+      {
+        "key": "end",
+        "command": "cursorEnd",
+        "when": "textInputFocus"
+      },
+      {
+        "key": "shift+end",
+        "command": "cursorEndSelect",
+        "when": "textInputFocus"
       },
       {
         "key": "ctrl+home",

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.2
+
+Fixed: plain Home/End (and Shift+Home/Shift+End) did nothing — only the
+Ctrl+Home/Ctrl+End document-navigation pair was bound, so line-relative
+Home/End fell through to whatever VS Code did natively, which for the chat
+sidebar's webview-hosted input was nothing at all. Added `home`/`end`
+bound to `cursorHome`/`cursorEnd`, and `shift+home`/`shift+end` to their
+`*Select` counterparts, all under `textInputFocus` like the existing pair.
+
 ## 0.1.1
 
 Fixed: plain Ctrl+V (paste in the regular editor, `editor.action.clipboardPasteAction`)
