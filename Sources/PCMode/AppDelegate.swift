@@ -3,8 +3,20 @@ import Cocoa
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let statusItemController = StatusItemController()
     private var permissionPollTimer: Timer?
+    /// Held for the app's lifetime to opt out of App Nap. PCMode's event tap
+    /// sits synchronously in front of every keystroke system-wide, and as an
+    /// LSUIElement app with no visible windows it's otherwise a prime App
+    /// Nap candidate — after a few idle seconds, the first keystroke stalls
+    /// while the process is woken, long enough that the frontmost app sees
+    /// the key as *held* and pops up the press-and-hold accent picker on a
+    /// vowel instead of typing it.
+    private var appNapActivity: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        appNapActivity = ProcessInfo.processInfo.beginActivity(
+            options: [.userInitiatedAllowingIdleSystemSleep, .latencyCritical],
+            reason: "Global keyboard event tap must respond without delay"
+        )
         requestAccessibilityPermissionIfNeeded()
         requestScreenRecordingPermissionIfNeeded()
         statusItemController.setup()

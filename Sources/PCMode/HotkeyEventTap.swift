@@ -103,8 +103,13 @@ final class HotkeyEventTap {
     func start() {
         teardown()
 
+        // keyUp is included (and always passed straight through) only so it
+        // queues behind the matching keyDown in this tap — otherwise a slow
+        // keyDown callback could let its keyUp reach the app first, leaving
+        // the key looking held (see `appNapActivity` in `AppDelegate`).
         let eventMask =
-            (1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.flagsChanged.rawValue) |
+            (1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.keyUp.rawValue) |
+            (1 << CGEventType.flagsChanged.rawValue) |
             (1 << CGEventType.leftMouseDown.rawValue) | (1 << CGEventType.leftMouseUp.rawValue)
 
         guard
