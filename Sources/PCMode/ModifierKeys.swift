@@ -1,10 +1,13 @@
 import Cocoa
 
 /// The physical modifier-key positions PCMode can tell apart, in Mac
-/// keyboard order left to right. There's no `.rightControl` case because
-/// Apple keyboards (and most third-party ones in Mac mode, including the
-/// Logitech K860) have no physical right Control key — the corresponding
-/// bottom-right position is Option.
+/// keyboard order left to right. Apple keyboards (and most third-party ones
+/// in Mac mode, including the Logitech K860) have no physical right Control
+/// key — that bottom-right position is Option, which is why `.rightOption`
+/// exists to fill Control's usual role there (see `defaultRole`). But many
+/// third-party/PC-layout keyboards *do* have a real physical Right Control
+/// key, so `.rightControl` covers that case too — it's simply never down on
+/// hardware that lacks the key.
 ///
 /// `CGEventFlags`'s public API (`.maskAlternate`, `.maskControl`, etc.) is
 /// device-*independent* — it can't tell left Option from right Option. But
@@ -20,6 +23,7 @@ enum ModifierSlot: String, CaseIterable {
     case leftCommand
     case rightCommand
     case rightOption
+    case rightControl
 
     /// Device-dependent bit for this slot, or `nil` for `fn` (which has no
     /// left/right variant and is covered by the public `.maskSecondaryFn`
@@ -32,6 +36,7 @@ enum ModifierSlot: String, CaseIterable {
         case .leftCommand: return 0x0008 // NX_DEVICELCMDKEYMASK
         case .rightCommand: return 0x0010 // NX_DEVICERCMDKEYMASK
         case .rightOption: return 0x0040 // NX_DEVICERALTKEYMASK
+        case .rightControl: return 0x2000 // NX_DEVICERCTLKEYMASK
         }
     }
 
@@ -54,6 +59,7 @@ enum ModifierSlot: String, CaseIterable {
         case .leftCommand: return [.maskCommand, CGEventFlags(rawValue: deviceBit!)]
         case .rightCommand: return [.maskCommand, CGEventFlags(rawValue: deviceBit!)]
         case .rightOption: return [.maskAlternate, CGEventFlags(rawValue: deviceBit!)]
+        case .rightControl: return [.maskControl, CGEventFlags(rawValue: deviceBit!)]
         }
     }
 
@@ -71,6 +77,7 @@ enum ModifierSlot: String, CaseIterable {
         case .leftCommand: return [.system]
         case .rightCommand: return [.system]
         case .rightOption: return [.system, .control]
+        case .rightControl: return [.system, .start, .command]
         }
     }
 
@@ -97,6 +104,7 @@ enum ModifierSlot: String, CaseIterable {
         case .leftCommand: return "Left Command (⌘)"
         case .rightCommand: return "Right Command (⌘)"
         case .rightOption: return "Right Option (⌥)"
+        case .rightControl: return "Right Control (⌃)"
         }
     }
 }
@@ -159,7 +167,7 @@ extension ModifierSlot {
         case .command: return .command
         case .system:
             switch self {
-            case .leftControl: return .control
+            case .leftControl, .rightControl: return .control
             case .leftCommand, .rightCommand: return .command
             case .fn, .leftOption, .rightOption: return nil
             }

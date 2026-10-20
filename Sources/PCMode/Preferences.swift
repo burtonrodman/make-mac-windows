@@ -66,7 +66,12 @@ final class Preferences {
     /// reach the far end), seeded in on first launch. User-editable in the
     /// Settings window (`SettingsWindowController`). VS Code isn't here: it's
     /// covered instead by `fullyExcludedBundleIDs` below, since it needs the
-    /// same protection for far more than just this one remap.
+    /// same protection for far more than just this one remap. Apps here also
+    /// get the Control-role key's flags rewritten to literal Control instead
+    /// of being left as native Option — see
+    /// `HotkeyEventTap.remapControlRoleToLiteralControl` — so e.g. Right
+    /// Option+C genuinely reaches Terminal as Control+C (SIGINT), not a
+    /// no-op Option+C.
     static let defaultCtrlCVDenylist = [
         "com.apple.Terminal",
         "com.googlecode.iterm2",
@@ -93,7 +98,12 @@ final class Preferences {
     /// clauses (`terminalFocus`, `editorTextFocus`) can distinguish the
     /// integrated terminal from the editor exactly, which is more complete
     /// and more reliable than anything PCMode could do from outside via
-    /// Accessibility.
+    /// Accessibility. Like `defaultCtrlCVDenylist`, apps here get the
+    /// Control-role key's flags rewritten to literal Control (see
+    /// `HotkeyEventTap.remapControlRoleToLiteralControl`) — that's what lets
+    /// `vscode-windows-keymap`'s literal `"ctrl+..."` keybindings fire from
+    /// a key (Right Option by default) that's really Option at the hardware
+    /// level.
     ///
     /// One deliberate exception: `HotkeyEventTap.remapControlArrow`
     /// (Control+Left/Right → Option+Left/Right) checks

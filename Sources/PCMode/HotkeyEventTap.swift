@@ -157,6 +157,14 @@ final class HotkeyEventTap {
             return Unmanaged.passUnretained(event)
         }
 
+        // Apps that need the literal keystroke (see the doc comment on
+        // `remapControlRoleToLiteralControl`) get the Control-role key's
+        // flags rewritten to genuine Control before anything else below
+        // looks at them.
+        if type == .flagsChanged || type == .keyDown {
+            remapControlRoleToLiteralControl(event: event)
+        }
+
         // Any real keypress while a modifier is held disqualifies a "tap"
         // gesture for that modifier — this is what keeps every Cmd+X or
         // Option+X shortcut (including Option/Command+Tab, if that's the
@@ -412,6 +420,52 @@ final class HotkeyEventTap {
 
         onLockScreen?()
         return true
+    }
+
+    /// Rewrites a Control-role key that's natively Option — Right Option by
+    /// default, or Left Option/fn if reassigned (see `ModifierKeys.swift`)
+    /// — so it reports as literal Control instead, for apps in
+    /// `Preferences.ctrlCVDenylistBundleIDs` or `.fullyExcludedBundleIDs`.
+    /// Those are exactly the apps that need the *literal* keystroke rather
+    /// than PCMode's usual Command-substitution: terminals/remote-desktop
+    /// consoles (Control+C for SIGINT, etc.) and VS Code, whose own
+    /// `vscode-windows-keymap` companion extension binds literal `ctrl+...`
+    /// combos. Without this, a key assigned the Control role there still
+    /// physically sends Option — neither Apple nor most third-party
+    /// keyboards, including the K860 even in Mac layout, have a real
+    /// physical right Control key — so those apps would see plain Option
+    /// and none of the above would work. Left Control/Right Control (on
+    /// keyboards that do have the physical key) need no rewriting; they're
+    /// already literal. Runs on `.flagsChanged` too, not just `.keyDown`,
+    /// so an app's own modifier-down tracking (which is what VS Code's
+    /// keybinding matcher relies on) sees Control, not just the following
+    /// letter's keystroke. Mutates `event.flags` in place; never swallows
+    /// the event, so every other remap below still runs — for terminals
+    /// and VS Code those all bail out on the same bundle-ID checks anyway.
+    private func remapControlRoleToLiteralControl(event: CGEvent) {
+        guard
+            let bundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
+            Preferences.shared.ctrlCVDenylistBundleIDs.contains(bundleID) ||
+                Preferences.fullyExcludedBundleIDs.contains(bundleID)
+        else {
+            return
+        }
+
+        var flags = event.flags
+        for slot in ModifierSlot.allCases {
+            guard slot.isDown(flags), Preferences.shared.role(for: slot) == .control else { continue }
+
+            let literalSlot: ModifierSlot?
+            switch slot {
+            case .leftOption: literalSlot = .leftControl
+            case .rightOption: literalSlot = .rightControl
+            default: literalSlot = nil // fn has no natural left/right Control counterpart
+            }
+
+            flags.subtract(slot.flagBits)
+            flags.formUnion(literalSlot?.flagBits ?? .maskControl)
+        }
+        event.flags = flags
     }
 
     /// Control+A/C/S/V/X, remapped to Command+A/C/S/V/X in place — mirroring
