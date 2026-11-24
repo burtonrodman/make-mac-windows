@@ -57,6 +57,7 @@ final class Preferences {
     private let ctrlClickMultiSelectKey = "ctrlClickMultiSelectEnabled"
     private let clickThroughActivationKey = "clickThroughActivationEnabled"
     private let screenSharingPassthroughFullScreenOnlyKey = "screenSharingPassthroughFullScreenOnly"
+    private let activateSingleWindowKey = "activateSingleWindowEnabled"
 
     /// Bundle identifiers exempted from the Control+A/C/S/V remap below —
     /// terminal emulators (where Control+A is readline's "beginning of
@@ -112,9 +113,13 @@ final class Preferences {
     /// navigation doesn't have the editor-vs-terminal ambiguity every other
     /// remap here does, and why it's the one shortcut the companion
     /// extension can't fix from inside the app at all.
-    /// `HotkeyEventTap.remapHomeEnd` is a partial exception too: plain
-    /// Home/End still becomes Command+Left/Right here (webview inputs need
-    /// it), while Control+Home/End is left for the extension.
+    /// `HotkeyEventTap.remapHomeEnd` (Home/End and Control+Home/End →
+    /// Command+Arrow) and Control+A → Command+A in
+    /// `HotkeyEventTap.remapControlShortcuts` are exceptions too: VS Code's
+    /// webview inputs (e.g. the Claude Code chat box) can't be reached by
+    /// extension keybindings, so PCMode sends the Mac-native keystroke and
+    /// the extension maps it back to the terminal's literal meaning under
+    /// `terminalFocus`.
     static let fullyExcludedBundleIDs = [
         "com.microsoft.VSCode",
     ]
@@ -334,6 +339,18 @@ final class Preferences {
     var clickThroughActivationEnabled: Bool {
         get { defaults.object(forKey: clickThroughActivationKey) as? Bool ?? false }
         set { defaults.set(newValue, forKey: clickThroughActivationKey) }
+    }
+
+    /// When PCMode itself activates a window (the Alt-Tab-style switcher,
+    /// click-through activation), bring forward *only* that window, like
+    /// Windows — instead of macOS's default of raising every window the app
+    /// owns. Uses private SkyLight calls (see `WindowActivator`) and falls
+    /// back to normal app activation if they're unavailable. Defaults
+    /// **on**. Doesn't affect activations PCMode doesn't perform (Dock,
+    /// native Cmd+Tab, apps activating themselves).
+    var activateSingleWindowEnabled: Bool {
+        get { defaults.object(forKey: activateSingleWindowKey) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: activateSingleWindowKey) }
     }
 
     /// Whether passthrough to a remote Screen Sharing session (see

@@ -563,6 +563,24 @@
         "when": "terminalFocus"
       },
       {
+        "key": "cmd+a",
+        "command": "workbench.action.terminal.sendSequence",
+        "args": {
+          "text": "\u0001"
+        },
+        "when": "terminalFocus"
+      },
+      {
+        "key": "cmd+up",
+        "command": "workbench.action.terminal.scrollToTop",
+        "when": "terminalFocus"
+      },
+      {
+        "key": "cmd+down",
+        "command": "workbench.action.terminal.scrollToBottom",
+        "when": "terminalFocus"
+      },
+      {
         "key": "ctrl+home",
         "command": "workbench.action.terminal.scrollToTop",
         "when": "terminalFocus"

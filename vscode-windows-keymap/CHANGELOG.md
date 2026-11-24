@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.3
+
+Fixed: Ctrl+A and Ctrl+Home/Ctrl+End did nothing in webview-hosted inputs
+such as the Claude Code chat box, for the same reason plain Home/End didn't
+before 0.1.4 — the `ctrl+a`/`ctrl+home`/`ctrl+end` bindings are scoped to
+`textInputFocus`, which is false inside a webview. PCMode now remaps
+Ctrl+A to Cmd+A and Ctrl+Home/End (with or without Shift) to Cmd+Up/Down
+in VS Code too. To keep the integrated terminal's Windows behavior, this
+release binds, under `terminalFocus`, `cmd+a` to send a literal `^A`
+(readline's beginning of line) and `cmd+up`/`cmd+down` to scroll to the
+top/bottom. Trade-off: a real Cmd+A / Cmd+Up / Cmd+Down in the terminal now
+does the same, instead of select-all / scroll-to-previous/next-command.
+
 ## 0.1.4
 
 Fixed: Home/End still did nothing in webview-hosted inputs such as the

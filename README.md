@@ -65,6 +65,23 @@ won't do anything if you've changed Spotlight's shortcut in System Settings
   owning app) via the Accessibility API, so switching works even between two
   windows of the same app.
 
+### Only the chosen window comes forward
+
+By default, activating a window brings forward **only that window**, like
+Windows — not every window the app owns, which is what macOS normally does
+(and what every public activation API does). This applies to every
+activation PCMode performs: the switcher and click-through activation
+(Feature 6). It uses private SkyLight calls (`_SLPSSetFrontProcessWithOptions`
++ `SLPSPostEventRecordTo`, the same technique AltTab uses), looked up at
+runtime so a future macOS that removes them just falls back to the old
+all-windows behavior. Toggle it from the menu bar's "Window Activation"
+section.
+
+It can't change activations PCMode doesn't perform — clicking a Dock icon,
+the native Cmd+Tab switcher, or an app activating itself still raise all of
+that app's windows. Unhiding a hidden (Cmd+H) app also always restores all
+its windows, so PCMode uses normal activation in that case.
+
 ### Known v1 limitations
 
 - Minimized windows aren't included yet (`CGWindowListCopyWindowInfo` only
@@ -107,7 +124,7 @@ notably VS Code, whose editor and integrated terminal are the same process
 — can't be split by a simple app-level exclusion list, since the event tap
 only knows which *app* is frontmost, not which view inside it has focus.
 Rather than pick one side of that tradeoff, VS Code is fully excluded from
-every PCMode keystroke remap (Control+A/C/S/V/X, Control+Home/End, and
+every PCMode keystroke remap (Control+C/S/V/X and
 Control+F4-closes-tab; the window switcher, tap-for-Spotlight, and snap
 shortcuts are unaffected, since none of those collide with anything VS Code
 itself binds) — see `Preferences.fullyExcludedBundleIDs`.
@@ -140,14 +157,15 @@ the app, ahead of that OS-level dispatch — which is exactly what PCMode's
 event tap is — can win that race. See
 `HotkeyEventTap.remapControlArrow`/`Preferences.controlArrowRemapEnabled`.
 
-Plain Home/End (and Shift+Home/End) is a second, partial exception: PCMode
-still remaps it to Command+Left/Right in VS Code. Its webview-hosted inputs
-(the Claude Code chat box, for one) are Chromium text fields where macOS
-treats the raw Home/End keys as scroll-only, and no extension keybinding
-can reach inside a webview. Command+Left/Right is line start/end everywhere
-in VS Code, and the companion extension turns it back into real Home/End
-sequences in the integrated terminal. Control+Home/End stays with the
-extension. See `HotkeyEventTap.remapHomeEnd`.
+Home/End, Control+Home/End (with or without Shift), and Control+A are a
+second exception: PCMode still remaps them to Command+Left/Right,
+Command+Up/Down, and Command+A in VS Code. Its webview-hosted inputs (the
+Claude Code chat box, for one) are Chromium text fields where macOS treats
+the raw Home/End keys as scroll-only, and no extension keybinding can reach
+inside a webview. The Command equivalents work everywhere in VS Code, and
+the companion extension turns them back into real Home/End sequences,
+scroll-to-top/bottom, and a literal ^A in the integrated terminal. See
+`HotkeyEventTap.remapHomeEnd` and `HotkeyEventTap.remapControlShortcuts`.
 
 ## Feature 4b: Start key + L locks the screen
 

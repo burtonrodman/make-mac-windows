@@ -515,9 +515,17 @@ final class HotkeyEventTap {
         }
 
         guard let bundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier else { return false }
-        if Preferences.shared.ctrlCVDenylistBundleIDs.contains(bundleID) ||
-            Preferences.fullyExcludedBundleIDs.contains(bundleID)
-        {
+        if Preferences.shared.ctrlCVDenylistBundleIDs.contains(bundleID) {
+            return false
+        }
+        // VS Code: only Control+A is remapped (to Command+A). Its webview
+        // inputs — the Claude Code chat box, for one — never see the
+        // companion extension's `ctrl+a` → `editor.action.selectAll`
+        // binding (`textInputFocus` is false inside a webview), whereas
+        // Command+A is select-all everywhere. The extension binds `cmd+a`
+        // under `terminalFocus` back to a literal ^A (readline's beginning
+        // of line). C/S/V/X stay literal for the extension's own bindings.
+        if Preferences.fullyExcludedBundleIDs.contains(bundleID), keyCode != kVK_ANSI_A {
             return false
         }
 
@@ -574,21 +582,19 @@ final class HotkeyEventTap {
     /// key(s) are currently assigned the `.control` role (see
     /// `ModifierKeys.swift`), not necessarily literal Control.
     ///
-    /// Partially applies to `Preferences.fullyExcludedBundleIDs` (VS Code):
-    /// plain Home/End (and Shift+Home/End) are still remapped there, but
-    /// Control+Home/End is left alone for the companion extension. VS Code's
-    /// webview-hosted inputs — the Claude Code chat box, for one — are
-    /// Chromium text fields, where macOS treats the raw Home/End keys as
-    /// scroll-to-top/bottom without moving the caret, and no extension
-    /// keybinding can reach inside a webview to fix that. Command+Left/Right
-    /// is line start/end everywhere in VS Code (Monaco's own `cursorHome`/
-    /// `cursorEnd` on Mac, webviews, find/quick-open inputs); the integrated
-    /// terminal would otherwise turn it into Ctrl+A/Ctrl+E, which the
-    /// companion extension rebinds back to real Home/End sequences. Control+
-    /// Home/End stays excluded because the extension binds it per-`when`
-    /// (`cursorTop` in the editor, `scrollToTop` in the terminal), whereas
-    /// Command+Up/Down in the terminal is scroll-to-previous-command.
-    /// Returns whether the event was remapped.
+    /// Applies to `Preferences.fullyExcludedBundleIDs` (VS Code) too, despite
+    /// the name. VS Code's webview-hosted inputs — the Claude Code chat box,
+    /// for one — are Chromium text fields, where macOS treats the raw
+    /// Home/End keys as scroll-to-top/bottom without moving the caret, and
+    /// no extension keybinding can reach inside a webview to fix that
+    /// (`textInputFocus` is false there). Command+Left/Right/Up/Down is
+    /// line/document start/end everywhere in VS Code (Monaco's own
+    /// `cursorHome`/`cursorTop` on Mac, webviews, find/quick-open inputs).
+    /// In the integrated terminal VS Code would otherwise turn those into
+    /// Ctrl+A/Ctrl+E and scroll-to-previous/next-command, so the companion
+    /// extension rebinds them under `terminalFocus` back to real Home/End
+    /// sequences and scroll-to-top/bottom. Returns whether the event was
+    /// remapped.
     private func remapHomeEnd(keyCode: Int, flags: CGEventFlags, event: CGEvent) -> Bool {
         guard Preferences.shared.homeEndRemapEnabled else { return false }
 
@@ -599,13 +605,6 @@ final class HotkeyEventTap {
         case kVK_Home: newKeyCode = isDocument ? kVK_UpArrow : kVK_LeftArrow
         case kVK_End: newKeyCode = isDocument ? kVK_DownArrow : kVK_RightArrow
         default: return false
-        }
-
-        if let bundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
-            Preferences.fullyExcludedBundleIDs.contains(bundleID),
-            isDocument || flags.contains(.maskControl)
-        {
-            return false
         }
 
         event.setIntegerValueField(.keyboardEventKeycode, value: Int64(newKeyCode))

@@ -30,6 +30,7 @@ final class StatusItemController {
     private let lockScreenToggleItem = NSMenuItem()
     private let ctrlClickToggleItem = NSMenuItem()
     private let clickThroughToggleItem = NSMenuItem()
+    private let singleWindowToggleItem = NSMenuItem()
 
     func setup() {
         if let button = statusItem.button {
@@ -161,6 +162,17 @@ final class StatusItemController {
         menu.addItem(clickThroughToggleItem)
 
         menu.addItem(.separator())
+
+        let activationHeader = NSMenuItem(title: "Window Activation", action: nil, keyEquivalent: "")
+        activationHeader.isEnabled = false
+        menu.addItem(activationHeader)
+
+        singleWindowToggleItem.title = "Bring Only the Chosen Window Forward (Not All of the App's Windows)"
+        singleWindowToggleItem.action = #selector(toggleActivateSingleWindow)
+        singleWindowToggleItem.target = self
+        menu.addItem(singleWindowToggleItem)
+
+        menu.addItem(.separator())
         menu.addItem(
             withTitle: "Quit PCMode",
             action: #selector(NSApplication.terminate(_:)),
@@ -236,6 +248,11 @@ final class StatusItemController {
         updateCheckmarks()
     }
 
+    @objc private func toggleActivateSingleWindow() {
+        Preferences.shared.activateSingleWindowEnabled.toggle()
+        updateCheckmarks()
+    }
+
     @objc private func showSettings() {
         SettingsWindowController.shared.show()
     }
@@ -256,5 +273,6 @@ final class StatusItemController {
         lockScreenToggleItem.state = Preferences.shared.lockScreenShortcutEnabled ? .on : .off
         ctrlClickToggleItem.state = Preferences.shared.ctrlClickMultiSelectEnabled ? .on : .off
         clickThroughToggleItem.state = Preferences.shared.clickThroughActivationEnabled ? .on : .off
+        singleWindowToggleItem.state = Preferences.shared.activateSingleWindowEnabled ? .on : .off
     }
 }
